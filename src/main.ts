@@ -10,11 +10,13 @@ import { FrequentPanel } from "./ui/frequent-panel";
 import { CommandManager } from "./ui/command-manager";
 import { TabManager, type Connection } from "./ui/tabs";
 import { connectProfile } from "./ui/connect";
+import { VpnChip } from "./ui/vpn-chip";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
 import "./styles/command-manager.css";
 import "./styles/blocks.css";
+import "./styles/hud.css";
 import { showStoreRecoveries } from "./ui/toast";
 
 const app = document.querySelector<HTMLElement>("#app")!;
@@ -24,7 +26,7 @@ app.innerHTML = `
     <div class="tabs" data-tauri-drag-region></div>
   </header>
   <div class="workspace">
-    <section class="term-body"></section>
+    <section class="term-body"><div class="res-mini"></div></section>
   </div>
   <footer class="statusbar">
     <div class="seg host"><span class="ico">◆</span> <span class="host-name">local</span></div>
@@ -91,7 +93,8 @@ const activeSession = () => tabs.activeSession();
 // Dev builds: lets scripts/devctl read terminal state (e.g. `devctl screen`).
 if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
 
-const connect = (profile: StoredCommand) => void connectProfile(tabs, profile);
+const vpn = new VpnChip(app.querySelector<HTMLElement>(".res-mini")!);
+const connect = (profile: StoredCommand) => void connectProfile(tabs, profile, vpn);
 const manager = new CommandManager(connect);
 const palette = new CommandPalette(
   activeSession,

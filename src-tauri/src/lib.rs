@@ -6,6 +6,7 @@ mod pty;
 mod remote;
 mod stats;
 mod store;
+mod vpn;
 
 use std::sync::Arc;
 
@@ -26,6 +27,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_top,
         remote::remote_probe,
         remote::remote_reachable,
+        vpn::vpn_status,
+        vpn::vpn_pre_connect,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
         devctl::dev_log,
@@ -46,6 +49,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_top,
         remote::remote_probe,
         remote::remote_reachable,
+        vpn::vpn_status,
+        vpn::vpn_pre_connect,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
     ]

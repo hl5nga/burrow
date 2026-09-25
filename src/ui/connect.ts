@@ -4,6 +4,7 @@ import { chooseDialog } from "./dialog";
 import { checkReachable } from "./reachability";
 import { showToast } from "./toast";
 import type { SessionTransport, TabManager } from "./tabs";
+import type { VpnChip } from "./vpn-chip";
 
 type HookStatus =
   | { state: "current" | "outdated" | "missing" | "noZsh" }
@@ -14,6 +15,31 @@ interface RemoteProbe {
   moshServer: boolean;
   tmux: boolean;
   localMosh: boolean;
+}
+
+const VPN_WAIT_MS = 15_000;
+
+/**
+ * Runs the profile's own VPN command when the host can't be reached yet, then
+ * waits for the host to answer. The command runs only when it is needed, and
+ * never for profiles that don't have one.
+ */
+async function bringUpVpn(profile: StoredCommand, label: string, vpn: VpnChip) {
+  showToast(`${label}에 닿지 않아 VPN 명령을 실행합니다: ${profile.vpnPreConnect}`);
+  try {
+    await invoke("vpn_pre_connect", { profileId: profile.id });
+  } catch (err) {
+    showToast(`VPN 명령이 실패했습니다 (${err}). 그래도 접속을 시도합니다`);
+  }
+  // Commands like `scutil --nc start` return before the tunnel is up.
+  const deadline = Date.now() + VPN_WAIT_MS;
+  let reach = await checkReachable(profile.id, true);
+  while (reach.state === "offline" && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1000));
+    reach = await checkReachable(profile.id, true);
+  }
+  void vpn.refresh();
+  return reach;
 }
 
 /** Profiles already told that installing mosh locally would help, this run. */
@@ -53,9 +79,13 @@ function chooseTransport(
  * host after the user agrees; without them the session still works, it just
  * isn't tracked.
  */
-export async function connectProfile(tabs: TabManager, profile: StoredCommand) {
+export async function connectProfile(tabs: TabManager, profile: StoredCommand, vpn: VpnChip) {
   const label = profile.name || profile.sshHost || "SSH";
-  const reach = await checkReachable(profile.id, true);
+  let reach = await checkReachable(profile.id, true);
+  // "unknown" (behind a proxy) could just as well need the VPN.
+  if (reach.state !== "online" && profile.vpnPreConnect?.trim()) {
+    reach = await bringUpVpn(profile, label, vpn);
+  }
   if (reach.state === "offline") {
     showToast(`${label} 오프라인 — ${reach.reason}`);
     return;

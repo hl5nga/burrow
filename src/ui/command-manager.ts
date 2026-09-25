@@ -68,7 +68,7 @@ const FIELDS: FieldSpec[] = [
     label: "접속 전 VPN 명령",
     for: "ssh-profile",
     placeholder: "tailscale up",
-    hint: "적어 둔 경우에만, 접속 직전에 이 컴퓨터에서 실행합니다",
+    hint: '적어 둔 경우에만, 호스트에 닿지 않을 때 이 Mac에서 실행합니다. 예: tailscale up · scutil --nc start "회사 VPN" · wg-quick up home (sudo가 필요한 명령은 안 됩니다)',
     mono: true,
   },
   { key: "description", label: "설명", for: "both", multiline: true },
