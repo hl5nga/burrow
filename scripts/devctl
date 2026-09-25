@@ -7,6 +7,7 @@
   scripts/devctl shot <out.png>
   scripts/devctl js <code>             # run JavaScript in the webview (DOM-level UI tests)
   scripts/devctl key <key> [meta]      # dispatch a keydown to the focused element
+  scripts/devctl screen [lines]        # print the active terminal's last lines (dev builds)
   scripts/devctl quit                 # graceful app exit (same path as Cmd+Q)
 """
 
@@ -42,6 +43,7 @@ def request(payload):
 
 def decode(text):
     # Round-trip through latin-1 so escapes are decoded but UTF-8 text survives.
+    text = text.replace("\\e", "\\x1b")
     return text.encode("utf-8").decode("unicode_escape").encode("latin-1").decode("utf-8")
 
 
@@ -76,6 +78,24 @@ def main(argv):
             "(document.activeElement||document.body).dispatchEvent(new KeyboardEvent('keydown',"
             f"{{key:{json.dumps(key)},code:{json.dumps(code)},metaKey:{meta},bubbles:true,cancelable:true}}))"
         )})
+    elif cmd == "screen":
+        n = int(args[0]) if args else 20
+        marker = f"SCREEN-{os.getpid()}"
+        log = os.path.join(tempfile.gettempdir(), "burrow-dev-events.log")
+        request({"cmd": "eval", "js": (
+            "{const t=window.__burrow.tabs.activeSession().term; const b=t.buffer.active;"
+            " const end=b.baseY+b.cursorY; const out=[];"
+            f" for(let y=Math.max(0,end-{n}+1); y<=end; y++) out.push(b.getLine(y)?.translateToString(true)??'');"
+            f" window.__TAURI__.core.invoke('dev_log',{{line:'{marker} '+JSON.stringify(out)}});}}"
+        )})
+        import time
+        for _ in range(20):
+            time.sleep(0.1)
+            with open(log, encoding="utf-8") as f:
+                hits = [l for l in f if l.startswith(marker)]
+            if hits:
+                print("\n".join(json.loads(hits[-1][len(marker) + 1:])))
+                break
     elif cmd == "quit":
         request({"cmd": "quit"})
     elif cmd == "shot":

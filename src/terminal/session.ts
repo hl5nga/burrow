@@ -109,6 +109,11 @@ export async function openTerminalSession(
   // Consumed before rendering, so hook events never show up on screen.
   const hookOsc = term.parser.registerOscHandler(HOOK_OSC, (data) => {
     const event = parseHookEvent(data);
+    if (import.meta.env.DEV) {
+      invoke("dev_log", {
+        line: `hook ${event ? JSON.stringify(event) : `unparsed ${data.slice(0, 40)}`}`,
+      });
+    }
     if (!event) return true;
     const branch = event.type === "prompt" ? event.branch : context.branch;
     if (event.cwd !== context.cwd || branch !== context.branch) {

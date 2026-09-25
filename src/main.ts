@@ -61,6 +61,8 @@ const tabs = new TabManager(
   },
 );
 const activeSession = () => tabs.activeSession();
+// Dev builds: lets scripts/devctl read terminal state (e.g. `devctl screen`).
+if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
 
 const manager = new CommandManager();
 const palette = new CommandPalette(activeSession, (id) =>

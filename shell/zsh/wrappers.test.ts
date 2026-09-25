@@ -117,3 +117,30 @@ test("the git branch is read without running git", () => {
     assert.equal(branch(home), "[]");
   });
 });
+
+test("inside tmux, events are DCS-wrapped and passthrough is enabled for the pane only", () => {
+  withHome({}, (home) => {
+    const bin = join(home, "bin");
+    mkdirSync(bin);
+    // A stand-in tmux that records how it was called.
+    writeFileSync(join(bin, "tmux"), `#!/bin/sh\necho "$@" >> "${join(home, "tmux-calls")}"\n`, {
+      mode: 0o755,
+    });
+    const out = runThroughWrappers(home, "__burrow_emit exec h /c 'echo hi'", {
+      TMUX: "/tmp/tmux-test,1,0",
+      PATH: `${bin}:${process.env.PATH}`,
+    });
+    const payload = Buffer.from("h\0/c\0echo hi\0").toString("base64");
+    assert.ok(out.includes(`\x1bPtmux;\x1b\x1b]9999;exec;${payload}\x07\x1b\\`), "DCS-wrapped OSC");
+    assert.match(readFileSync(join(home, "tmux-calls"), "utf8"), /^set -p allow-passthrough on$/m);
+  });
+});
+
+test("outside tmux, events are plain OSC", () => {
+  withHome({}, (home) => {
+    const out = runThroughWrappers(home, "__burrow_emit exec h /c 'echo hi'");
+    const payload = Buffer.from("h\0/c\0echo hi\0").toString("base64");
+    assert.ok(out.includes(`\x1b]9999;exec;${payload}\x07`));
+    assert.ok(!out.includes("\x1bPtmux;"));
+  });
+});
