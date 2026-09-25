@@ -110,7 +110,14 @@ body::after {
   box-shadow: 0 0 6px var(--success);
 }
 
+.workspace {
+  display: flex;
+  min-height: 0;
+}
+
 .term-body {
+  flex: 1;
+  min-width: 0;
   min-height: 0;
   padding: 10px 6px 4px 14px;
   background: var(--bg-panel);

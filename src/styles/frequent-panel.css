@@ -1,0 +1,223 @@
+.freq-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 300px;
+  min-height: 0;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border);
+  outline: none;
+}
+
+.freq-panel[hidden],
+.freq-rail[hidden] {
+  display: none;
+}
+
+.freq-panel:focus-within .freq-panel-head h4 {
+  color: var(--amber);
+}
+
+.freq-panel-head {
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid #1a1d22;
+}
+
+.fp-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.fp-title-row h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-hi);
+}
+
+.fp-title-row .dot-live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 6px rgba(255, 176, 0, 0.35);
+}
+
+.hotkey-hint {
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.scope-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: #0c0e11;
+  border-radius: 8px;
+}
+
+.scope-tabs .st {
+  all: unset;
+  flex: 1;
+  padding: 6px 4px;
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.scope-tabs .st.active {
+  color: var(--amber);
+  background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px rgba(255, 176, 0, 0.28);
+}
+
+.freq-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.freq-item {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--bg-panel);
+  border: 1px solid #1a1d22;
+  border-radius: 9px;
+  cursor: default;
+}
+
+.freq-item:hover {
+  border-color: rgba(255, 176, 0, 0.35);
+  background: rgba(255, 176, 0, 0.05);
+}
+
+.freq-item.top {
+  border-color: rgba(255, 176, 0, 0.4);
+  background: linear-gradient(135deg, rgba(255, 176, 0, 0.13), rgba(255, 176, 0, 0.02));
+}
+
+.fi-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #0a0b0d;
+  background: var(--text-dim);
+  border-radius: 5px;
+}
+
+.freq-item.top .fi-key {
+  background: var(--amber);
+}
+
+.fi-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.fi-cmd {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-hi);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fi-meta {
+  margin-top: 2px;
+  font-family: var(--ui);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.fi-meta.fresh {
+  color: var(--amber);
+}
+
+.fi-count {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--amber);
+}
+
+.freq-empty {
+  padding: 18px 8px;
+  font-family: var(--ui);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.freq-panel-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-family: var(--ui);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  border-top: 1px solid #1a1d22;
+}
+
+.freq-rail {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  width: 38px;
+  padding-top: 14px;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border);
+  cursor: default;
+}
+
+.freq-rail .rail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  color: var(--amber);
+  background: rgba(255, 176, 0, 0.08);
+  border: 1px solid rgba(255, 176, 0, 0.25);
+  border-radius: 7px;
+}
+
+.freq-rail .rail-hotkey {
+  margin-top: auto;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  writing-mode: vertical-rl;
+}

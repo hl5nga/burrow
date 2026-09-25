@@ -108,6 +108,7 @@ pub struct ConfigFile {
     #[serde(default = "current_version")]
     pub version: u32,
     pub promotion_threshold: u32,
+    pub frequent_panel_open: bool,
 }
 
 impl Default for ConfigFile {
@@ -115,6 +116,7 @@ impl Default for ConfigFile {
         Self {
             version: CURRENT_VERSION,
             promotion_threshold: 5,
+            frequent_panel_open: true,
         }
     }
 }

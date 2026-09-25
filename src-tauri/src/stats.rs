@@ -18,6 +18,15 @@ pub fn normalize(raw: &str) -> Option<String> {
     (!cmd.is_empty()).then(|| cmd.to_string())
 }
 
+/// Recorded like any command, but too trivial to be worth a slot in the
+/// frequently-used lists.
+fn is_noise(cmd: &str) -> bool {
+    matches!(
+        cmd,
+        "cd" | "ls" | "ll" | "la" | "clear" | "exit" | "pwd" | "cd -" | "cd .."
+    ) || cmd.starts_with("cd ")
+}
+
 pub fn record(stats: &mut StatsFile, host: &str, cwd: &str, cmd: &str) {
     let host = stats.hosts.entry(host.to_string()).or_default();
     *host.global.entry(cmd.to_string()).or_default() += 1;
@@ -75,7 +84,7 @@ pub fn top(
     }
     let mut ranked: Vec<Ranked> = counts
         .into_iter()
-        .filter(|(_, n)| *n >= threshold)
+        .filter(|(cmd, n)| *n >= threshold && !is_noise(cmd))
         .map(|(command, count)| Ranked { command, count })
         .collect();
     // Ties are broken alphabetically so the list order is stable between refreshes.
@@ -178,6 +187,30 @@ mod tests {
             ["git status"]
         );
         assert!(top(&s, "unknown", "/", Scope::Host, 1, 10).is_empty());
+    }
+
+    #[test]
+    fn navigation_and_cleanup_commands_are_not_ranked() {
+        let mut s = StatsFile::default();
+        for cmd in [
+            "cd /tmp",
+            "cd",
+            "ls",
+            "clear",
+            "exit",
+            "pwd",
+            "lsof -i :3000",
+        ] {
+            for _ in 0..5 {
+                record(&mut s, "local", "/", cmd);
+            }
+        }
+        let ranked: Vec<_> = top(&s, "local", "/", Scope::Host, 1, 10)
+            .into_iter()
+            .map(|r| r.command)
+            .collect();
+        assert_eq!(ranked, ["lsof -i :3000"]);
+        assert_eq!(s.hosts["local"].global["cd /tmp"], 5, "still recorded");
     }
 
     #[test]
