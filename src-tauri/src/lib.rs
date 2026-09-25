@@ -7,6 +7,7 @@ mod store;
 
 use std::sync::Arc;
 
+use tauri::webview::PageLoadEvent;
 use tauri::{Manager, RunEvent};
 
 #[cfg(debug_assertions)]
@@ -58,6 +59,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(invoke_handler())
+        // A reload (including Vite HMR) starts a fresh page that knows nothing of
+        // the old shells, so they would otherwise keep running unseen.
+        .on_page_load(|webview, payload| {
+            if payload.event() == PageLoadEvent::Started {
+                webview.state::<pty::PtyState>().kill_all();
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {

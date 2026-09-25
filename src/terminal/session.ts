@@ -51,6 +51,15 @@ const theme = {
 
 export interface TerminalSession {
   term: Terminal;
+  context(): SessionContext;
+  /** True between a command starting and the next prompt. */
+  isRunning(): boolean;
+  /**
+   * Runs `command` as if typed. At an idle prompt the line is cleared first;
+   * while a program is running the text is only typed, never executed blind.
+   */
+  run(command: string): void;
+  focus(): void;
   dispose(): void;
 }
 
@@ -89,6 +98,7 @@ export async function openTerminalSession(
   term.open(container);
 
   const context: SessionContext = { host: "local", cwd: "" };
+  let running = false;
   // Consumed before rendering, so hook events never show up on screen.
   const hookOsc = term.parser.registerOscHandler(HOOK_OSC, (data) => {
     const event = parseHookEvent(data);
@@ -98,12 +108,15 @@ export async function openTerminalSession(
       handlers.onContext?.({ ...context });
     }
     if (event.type === "exec") {
+      running = true;
       invoke("stats_record", { host: context.host, cwd: event.cwd, cmd: event.cmd });
+    } else {
+      running = false;
     }
     handlers.onHookEvent?.(event);
     return true;
   });
-  const removeIme = installImeHandler(term, container);
+  const ime = installImeHandler(term, container);
   const removeDevLog = import.meta.env.DEV ? installInputEventLog(term) : () => {};
 
   // A newly loaded glyph chunk would otherwise keep its fallback-font rendering
@@ -150,12 +163,27 @@ export async function openTerminalSession(
 
   term.focus();
 
+  const write = (data: string) => invoke("pty_write", { id, data });
+
   return {
     term,
+    context: () => ({ ...context }),
+    isRunning: () => running,
+    run(command) {
+      ime.reset();
+      if (running) {
+        write(command);
+      } else {
+        // Ctrl-U clears whatever is half-typed so the command runs on its own.
+        write(`\x15${command}\r`);
+      }
+      term.scrollToBottom();
+    },
+    focus: () => term.focus(),
     dispose() {
       observer.disconnect();
       hookOsc.dispose();
-      removeIme();
+      ime.dispose();
       removeDevLog();
       document.fonts.removeEventListener("loadingdone", onFontsLoaded);
       dataSub.dispose();

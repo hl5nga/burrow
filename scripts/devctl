@@ -5,6 +5,8 @@
   scripts/devctl type <id> <text>      # \\r \\n \\e \\t and \\xNN escapes are decoded
   scripts/devctl size <width> <height>
   scripts/devctl shot <out.png>
+  scripts/devctl js <code>             # run JavaScript in the webview (DOM-level UI tests)
+  scripts/devctl key <key> [meta]      # dispatch a keydown to the focused element
   scripts/devctl quit                 # graceful app exit (same path as Cmd+Q)
 """
 
@@ -62,6 +64,18 @@ def main(argv):
         request({"cmd": "write", "id": int(args[0]), "data": decode(" ".join(args[1:]))})
     elif cmd == "size":
         request({"cmd": "window_size", "width": float(args[0]), "height": float(args[1])})
+    elif cmd == "js":
+        # A block scope keeps `const` from leaking into the page's global lexical
+        # scope, where a second run would fail with a redeclaration error.
+        request({"cmd": "eval", "js": "{" + " ".join(args) + "\n}"})
+    elif cmd == "key":
+        key = args[0]
+        meta = "true" if "meta" in args[1:] else "false"
+        code = f"Key{key.upper()}" if len(key) == 1 and key.isalpha() else key
+        request({"cmd": "eval", "js": (
+            "(document.activeElement||document.body).dispatchEvent(new KeyboardEvent('keydown',"
+            f"{{key:{json.dumps(key)},code:{json.dumps(code)},metaKey:{meta},bubbles:true,cancelable:true}}))"
+        )})
     elif cmd == "quit":
         request({"cmd": "quit"})
     elif cmd == "shot":

@@ -16,8 +16,18 @@ use crate::pty::PtyState;
 #[serde(tag = "cmd", rename_all = "snake_case")]
 enum Request {
     Sessions,
-    Write { id: u32, data: String },
-    WindowSize { width: f64, height: f64 },
+    Write {
+        id: u32,
+        data: String,
+    },
+    WindowSize {
+        width: f64,
+        height: f64,
+    },
+    /// Runs JavaScript in the main webview (fire-and-forget) to drive DOM UI.
+    Eval {
+        js: String,
+    },
     Quit,
 }
 
@@ -82,6 +92,10 @@ fn handle(app: &AppHandle, req: Request) -> Value {
     let result = match req {
         Request::Sessions => return json!({ "ok": pty.ids() }),
         Request::Write { id, data } => pty.write(id, data.as_bytes()),
+        Request::Eval { js } => app
+            .get_webview_window("main")
+            .ok_or_else(|| "no main window".to_string())
+            .and_then(|w| w.eval(&js).map_err(|e| e.to_string())),
         Request::Quit => {
             app.exit(0);
             Ok(())

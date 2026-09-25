@@ -48,7 +48,13 @@ function keySequence(term: Terminal, e: KeyboardEvent): string | undefined {
   }
 }
 
-export function installImeHandler(term: Terminal, container: HTMLElement): () => void {
+export interface ImeHandler {
+  /** Forget the textarea context after input reached the shell some other way. */
+  reset(): void;
+  dispose(): void;
+}
+
+export function installImeHandler(term: Terminal, container: HTMLElement): ImeHandler {
   const textarea = term.textarea!;
   const preview = document.createElement("div");
   preview.className = "ime-preview";
@@ -212,10 +218,13 @@ export function installImeHandler(term: Terminal, container: HTMLElement): () =>
   const renderSub = term.onRender(syncTextarea);
   syncTextarea();
 
-  return () => {
-    for (const [type, fn] of listeners) container.removeEventListener(type, fn, true);
-    cursorSub.dispose();
-    renderSub.dispose();
-    preview.remove();
+  return {
+    reset: resetContext,
+    dispose() {
+      for (const [type, fn] of listeners) container.removeEventListener(type, fn, true);
+      cursorSub.dispose();
+      renderSub.dispose();
+      preview.remove();
+    },
   };
 }

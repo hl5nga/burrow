@@ -3,7 +3,9 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./styles/fonts.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { openTerminalSession } from "./terminal/session";
+import { openTerminalSession, type TerminalSession } from "./terminal/session";
+import { CommandPalette } from "./ui/palette";
+import "./styles/palette.css";
 import { showStoreRecoveries } from "./ui/toast";
 
 const app = document.querySelector<HTMLElement>("#app")!;
@@ -26,13 +28,33 @@ const host = app.querySelector<HTMLElement>(".term-host")!;
 
 const cwdLabel = app.querySelector<HTMLElement>(".statusbar .cwd")!;
 
+let session: TerminalSession | undefined;
+const palette = new CommandPalette(() => session);
+
+// Matched on the physical key so the shortcut still works with a Korean input source.
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && e.code === "KeyK") {
+      e.preventDefault();
+      e.stopPropagation();
+      palette.toggle();
+    }
+  },
+  true,
+);
+
 openTerminalSession(host, {
   onExit: () => getCurrentWindow().close(),
   onContext: ({ cwd }) => {
     cwdLabel.textContent = cwd;
   },
-}).catch((err) => {
-  host.textContent = `터미널을 시작하지 못했습니다: ${err}`;
-});
+})
+  .then((s) => {
+    session = s;
+  })
+  .catch((err) => {
+    host.textContent = `터미널을 시작하지 못했습니다: ${err}`;
+  });
 
 showStoreRecoveries();
