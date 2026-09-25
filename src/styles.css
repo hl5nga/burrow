@@ -1,9 +1,19 @@
 :root {
   --bg-panel: #111317;
-  --text-hi: #eeece6;
-  --text-dim: #5b6167;
+  --bg-elevated: #15171b;
+  --border: #24282e;
   --amber: #ffb000;
+  --cyan: #4be3d0;
+  --text-hi: #eeece6;
+  --text-mid: #9aa0a6;
+  --text-dim: #5b6167;
+  --success: #54d68a;
   --mono: "JetBrains Mono", "D2Coding", "Sarasa Mono K", ui-monospace, monospace;
+
+  --titlebar-h: 38px;
+  --statusbar-h: 26px;
+  /* Room for the native macOS traffic lights drawn over the overlay titlebar. */
+  --traffic-lights-w: 78px;
 
   color-scheme: dark;
 }
@@ -15,35 +25,103 @@
 }
 
 html,
-body,
-#app {
+body {
   height: 100%;
+  overflow: hidden;
   background: var(--bg-panel);
   color: var(--text-hi);
   font-family: var(--mono);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.placeholder {
+#app {
+  display: grid;
+  grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
+  height: 100%;
+}
+
+.titlebar {
+  display: flex;
+  align-items: flex-end;
+  padding-left: var(--traffic-lights-w);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  height: 100%;
+  flex: 1;
+  align-items: flex-end;
+}
+
+.tab {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 40px;
-  font-weight: 800;
+  gap: 8px;
+  height: 30px;
+  padding: 0 16px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  border-radius: 8px 8px 0 0;
+}
+
+.tab .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.tab.active {
+  background: var(--bg-panel);
   color: var(--text-hi);
+  border: 1px solid var(--border);
+  border-bottom-color: var(--bg-panel);
+  margin-bottom: -1px;
 }
 
-.placeholder .cursor {
-  display: inline-block;
-  width: 0.5em;
-  height: 0.85em;
-  margin-left: 4px;
-  background: var(--amber);
-  animation: blink 1.1s steps(1) infinite;
+.tab.active .dot {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
 }
 
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
+.term-body {
+  min-height: 0;
+  padding: 10px 6px 4px 14px;
+  background: var(--bg-panel);
+}
+
+.term-host {
+  width: 100%;
+  height: 100%;
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  font-size: 11.5px;
+  color: var(--text-mid);
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+}
+
+.statusbar .seg {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.statusbar .seg.host {
+  color: var(--cyan);
+}
+
+.statusbar .divider {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
 }

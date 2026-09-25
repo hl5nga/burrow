@@ -15,6 +15,8 @@ npm run format
 npm run lint
 ```
 
+debug 빌드를 띄운 상태에서 `scripts/devctl`로 입력 전송·창 크기 변경·창 캡처를 자동화할 수 있다 (개발용 제어 소켓, release 빌드에는 없음).
+
 필요: Rust stable, Xcode Command Line Tools, Node 20+.
 
 ## 구조

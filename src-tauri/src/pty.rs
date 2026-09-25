@@ -1,0 +1,206 @@
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::Mutex;
+use std::thread;
+use std::time::{Duration, Instant};
+
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
+use serde::Serialize;
+use tauri::ipc::{Channel, InvokeResponseBody};
+use tauri::{AppHandle, Emitter, Manager};
+
+const READ_BUF: usize = 16 * 1024;
+const MAX_BATCH: usize = 256 * 1024;
+const COALESCE_WINDOW: Duration = Duration::from_millis(8);
+
+struct Session {
+    master: Box<dyn MasterPty + Send>,
+    writer: Box<dyn Write + Send>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
+}
+
+#[derive(Default)]
+pub struct PtyState {
+    sessions: Mutex<HashMap<u32, Session>>,
+    next_id: AtomicU32,
+}
+
+impl PtyState {
+    pub fn write(&self, id: u32, data: &[u8]) -> Result<(), String> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let session = sessions.get_mut(&id).ok_or("unknown session")?;
+        session.writer.write_all(data).map_err(|e| e.to_string())
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn ids(&self) -> Vec<u32> {
+        let mut ids: Vec<u32> = self.sessions.lock().unwrap().keys().copied().collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    pub fn kill_all(&self) {
+        let mut sessions = self.sessions.lock().unwrap();
+        for (_, mut session) in sessions.drain() {
+            let _ = session.killer.kill();
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct PtyExit {
+    id: u32,
+    code: Option<u32>,
+}
+
+fn default_shell() -> String {
+    std::env::var("SHELL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "/bin/zsh".into())
+}
+
+fn build_command() -> CommandBuilder {
+    let mut cmd = CommandBuilder::new(default_shell());
+    cmd.arg("-l");
+    if let Some(home) = std::env::var_os("HOME") {
+        cmd.cwd(home);
+    }
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd.env("TERM_PROGRAM", "Burrow");
+    cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
+    // Apps launched from Finder get no LANG, which breaks CJK input in zsh.
+    if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
+        cmd.env("LANG", "en_US.UTF-8");
+    }
+    cmd
+}
+
+// Small reads (keystroke echo) go out immediately; a full read buffer means bulk
+// output is streaming, so wait briefly to coalesce it into fewer IPC messages.
+fn forward_output(rx: mpsc::Receiver<Vec<u8>>, on_output: &Channel<InvokeResponseBody>) {
+    while let Ok(mut batch) = rx.recv() {
+        if batch.len() >= READ_BUF {
+            let deadline = Instant::now() + COALESCE_WINDOW;
+            while batch.len() < MAX_BATCH {
+                let Some(wait) = deadline.checked_duration_since(Instant::now()) else {
+                    break;
+                };
+                match rx.recv_timeout(wait) {
+                    Ok(chunk) => batch.extend_from_slice(&chunk),
+                    Err(RecvTimeoutError::Timeout) => break,
+                    Err(RecvTimeoutError::Disconnected) => break,
+                }
+            }
+        }
+        while let Ok(chunk) = rx.try_recv() {
+            batch.extend_from_slice(&chunk);
+            if batch.len() >= MAX_BATCH {
+                break;
+            }
+        }
+        if on_output.send(InvokeResponseBody::Raw(batch)).is_err() {
+            break;
+        }
+    }
+}
+
+#[tauri::command]
+pub fn pty_spawn(
+    app: AppHandle,
+    state: tauri::State<'_, PtyState>,
+    cols: u16,
+    rows: u16,
+    on_output: Channel<InvokeResponseBody>,
+) -> Result<u32, String> {
+    let pair = native_pty_system()
+        .openpty(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut child = pair
+        .slave
+        .spawn_command(build_command())
+        .map_err(|e| e.to_string())?;
+    // The reader only sees EOF once every handle to the slave side is closed.
+    drop(pair.slave);
+
+    let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
+    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    let killer = child.clone_killer();
+
+    let id = state.next_id.fetch_add(1, Ordering::Relaxed) + 1;
+    state.sessions.lock().unwrap().insert(
+        id,
+        Session {
+            master: pair.master,
+            writer,
+            killer,
+        },
+    );
+
+    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    thread::spawn(move || {
+        let mut buf = vec![0u8; READ_BUF];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    if tx.send(buf[..n].to_vec()).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    thread::spawn(move || {
+        forward_output(rx, &on_output);
+        let code = child.wait().ok().map(|status| status.exit_code());
+        app.state::<PtyState>().sessions.lock().unwrap().remove(&id);
+        let _ = app.emit("pty-exit", PtyExit { id, code });
+    });
+
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn pty_write(state: tauri::State<'_, PtyState>, id: u32, data: String) -> Result<(), String> {
+    state.write(id, data.as_bytes())
+}
+
+#[tauri::command]
+pub fn pty_resize(
+    state: tauri::State<'_, PtyState>,
+    id: u32,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
+    let sessions = state.sessions.lock().unwrap();
+    let session = sessions.get(&id).ok_or("unknown session")?;
+    session
+        .master
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn pty_kill(state: tauri::State<'_, PtyState>, id: u32) -> Result<(), String> {
+    let mut sessions = state.sessions.lock().unwrap();
+    if let Some(session) = sessions.get_mut(&id) {
+        session.killer.kill().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
