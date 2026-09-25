@@ -1,0 +1,49 @@
+:root {
+  --bg-panel: #111317;
+  --text-hi: #eeece6;
+  --text-dim: #5b6167;
+  --amber: #ffb000;
+  --mono: "JetBrains Mono", "D2Coding", "Sarasa Mono K", ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  background: var(--bg-panel);
+  color: var(--text-hi);
+  font-family: var(--mono);
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--text-hi);
+}
+
+.placeholder .cursor {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.85em;
+  margin-left: 4px;
+  background: var(--amber);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
