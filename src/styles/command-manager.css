@@ -203,7 +203,10 @@
   background: var(--success);
 }
 
-.h-status.offline,
+.h-status.offline {
+  background: #ff6259;
+}
+
 .h-status.unknown {
   background: var(--text-dim);
 }

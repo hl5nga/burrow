@@ -1,12 +1,52 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { StoredCommand } from "./command-validation";
 import { chooseDialog } from "./dialog";
+import { checkReachable } from "./reachability";
 import { showToast } from "./toast";
-import type { TabManager } from "./tabs";
+import type { SessionTransport, TabManager } from "./tabs";
 
 type HookStatus =
   | { state: "current" | "outdated" | "missing" | "noZsh" }
   | { state: "unreachable"; reason: string };
+
+interface RemoteProbe {
+  hooks: HookStatus;
+  moshServer: boolean;
+  tmux: boolean;
+  localMosh: boolean;
+}
+
+/** Profiles already told that installing mosh locally would help, this run. */
+const moshHintShown = new Set<string>();
+
+function chooseTransport(
+  profile: StoredCommand,
+  probe: RemoteProbe,
+  label: string,
+): SessionTransport {
+  const reachable = probe.hooks.state !== "unreachable";
+  if (profile.transport === "ssh") return "ssh";
+  if (profile.transport === "mosh") {
+    if (!probe.localMosh) {
+      showToast("이 Mac에 mosh가 없어 SSH로 접속합니다 (brew install mosh)");
+      return "ssh";
+    }
+    if (reachable && !probe.moshServer) {
+      showToast(`${label}에 mosh-server가 없어 SSH로 접속합니다`);
+      return "ssh";
+    }
+    return "mosh";
+  }
+  // auto: Mosh whenever both ends have it.
+  if (probe.moshServer && probe.localMosh) return "mosh";
+  if (probe.moshServer && !moshHintShown.has(profile.id)) {
+    moshHintShown.add(profile.id);
+    showToast(
+      `${label}에 mosh-server가 있습니다. 이 Mac에도 mosh를 설치하면 (brew install mosh) 네트워크가 바뀌어도 세션이 유지됩니다`,
+    );
+  }
+  return "ssh";
+}
 
 /**
  * Opens an SSH profile in a new tab. Burrow's hooks are only installed on the
@@ -15,14 +55,21 @@ type HookStatus =
  */
 export async function connectProfile(tabs: TabManager, profile: StoredCommand) {
   const label = profile.name || profile.sshHost || "SSH";
-  let status: HookStatus;
+  const reach = await checkReachable(profile.id, true);
+  if (reach.state === "offline") {
+    showToast(`${label} 오프라인 — ${reach.reason}`);
+    return;
+  }
+
+  let probe: RemoteProbe;
   try {
-    status = await invoke<HookStatus>("remote_hook_status", { profileId: profile.id });
+    probe = await invoke<RemoteProbe>("remote_probe", { profileId: profile.id });
   } catch (err) {
     showToast(`${label}: ${err}`);
     return;
   }
 
+  const status = probe.hooks;
   let withHooks = status.state === "current";
   if (status.state === "missing" || status.state === "outdated") {
     const outdated = status.state === "outdated";
@@ -54,5 +101,9 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand) {
     showToast(`${label} 상태를 미리 확인하지 못했습니다 (${status.reason}). 훅 없이 접속합니다`);
   }
 
-  await tabs.newSshTab(profile.id, label, withHooks);
+  if (profile.tmuxSession && status.state !== "unreachable" && !probe.tmux) {
+    showToast(`${label}에 tmux가 없어 일반 셸로 접속합니다`);
+  }
+  const transport = chooseTransport(profile, probe, label);
+  await tabs.newSshTab(profile.id, label, withHooks, transport);
 }

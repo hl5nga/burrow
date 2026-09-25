@@ -3,11 +3,12 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./styles/fonts.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import type { SessionContext } from "./terminal/session";
 import { CommandPalette } from "./ui/palette";
 import { FrequentPanel } from "./ui/frequent-panel";
 import { CommandManager } from "./ui/command-manager";
-import { TabManager } from "./ui/tabs";
+import { TabManager, type Connection } from "./ui/tabs";
 import { connectProfile } from "./ui/connect";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
@@ -30,6 +31,7 @@ app.innerHTML = `
     <div class="divider"></div>
     <div class="seg cwd"></div>
     <div class="seg branch" hidden><span class="ico">⎇</span> <span class="branch-name"></span></div>
+    <div class="seg transport" hidden></div>
   </footer>
 `;
 
@@ -38,7 +40,29 @@ const status = {
   cwd: app.querySelector<HTMLElement>(".statusbar .cwd")!,
   branch: app.querySelector<HTMLElement>(".statusbar .branch")!,
   branchName: app.querySelector<HTMLElement>(".statusbar .branch-name")!,
+  transport: app.querySelector<HTMLElement>(".statusbar .transport")!,
 };
+
+const CONNECTION_STATE: Record<Connection["state"], string> = {
+  connecting: "연결 중…",
+  connected: "",
+  reconnecting: "재연결 중…",
+  offline: "오프라인",
+  stopped: "끊김",
+};
+
+function showConnection(connection: Connection | undefined) {
+  status.transport.hidden = !connection;
+  if (!connection) return;
+  const name = connection.transport === "mosh" ? "Mosh" : "SSH";
+  const state = CONNECTION_STATE[connection.state];
+  status.transport.textContent = state ? `${name} · ${state}` : name;
+  status.transport.dataset.state = connection.state;
+  status.transport.title =
+    connection.transport === "mosh"
+      ? "Mosh: 네트워크가 바뀌어도 세션이 유지됩니다"
+      : "SSH: 끊기면 자동으로 다시 연결합니다";
+}
 
 function showContext(context: SessionContext | undefined) {
   status.host.textContent = context?.host ?? "local";
@@ -59,6 +83,7 @@ const tabs = new TabManager(
       // stats_record went out on "exec"; by the next prompt the counts include it.
       if (event.type === "prompt") void frequent.refresh();
     },
+    onActiveConnection: showConnection,
     onLastTabClosed: () => getCurrentWindow().close(),
   },
 );
@@ -128,4 +153,5 @@ window.addEventListener(
 );
 
 void tabs.newTab().then(() => frequent.init());
+void listen("network-changed", () => tabs.networkChanged());
 showStoreRecoveries();

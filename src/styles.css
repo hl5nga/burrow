@@ -110,6 +110,23 @@ body::after {
   box-shadow: 0 0 6px var(--success);
 }
 
+.tab .dot.reconnecting {
+  background: var(--amber);
+  box-shadow: 0 0 6px var(--amber);
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+.tab .dot.offline {
+  background: #ff6259;
+  box-shadow: none;
+}
+
+@keyframes dot-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .workspace {
   display: flex;
   min-height: 0;
@@ -167,6 +184,28 @@ body::after {
 
 .statusbar .seg.branch {
   color: var(--violet, #9b8cff);
+}
+
+.statusbar .seg.transport {
+  margin-left: auto;
+  padding: 1px 7px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--cyan);
+  border: 1px solid rgba(75, 227, 208, 0.25);
+  border-radius: 5px;
+}
+
+.statusbar .seg.transport[data-state="reconnecting"],
+.statusbar .seg.transport[data-state="connecting"] {
+  color: var(--amber);
+  border-color: rgba(255, 176, 0, 0.35);
+}
+
+.statusbar .seg.transport[data-state="offline"],
+.statusbar .seg.transport[data-state="stopped"] {
+  color: #ff6259;
+  border-color: rgba(255, 98, 89, 0.35);
 }
 
 .statusbar .seg[hidden] {

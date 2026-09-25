@@ -60,6 +60,10 @@ export interface TerminalSession {
    * while a program is running the text is only typed, never executed blind.
    */
   run(command: string): void;
+  /** Starts the process again in the same terminal, e.g. after a dropped connection. */
+  restart(): Promise<void>;
+  /** Prints a dim status line into the terminal (not sent to the process). */
+  notice(text: string): void;
   focus(): void;
   dispose(): void;
 }
@@ -74,6 +78,8 @@ export interface SessionContext {
 
 export interface SessionHandlers {
   onExit(code: number | null): void;
+  /** Keys typed while no process is running (after an exit the tab kept open). */
+  onInputWhileStopped?(data: string): void;
   onContext?(context: SessionContext): void;
   onHookEvent?(event: HookEvent): void;
 }
@@ -164,22 +170,29 @@ export async function openTerminalSession(
 
   fit.fit();
 
-  const output = new Channel<ArrayBuffer>();
-  output.onmessage = (chunk) => term.write(new Uint8Array(chunk));
-
-  const id = await (options.spawn
-    ? options.spawn(term.cols, term.rows, output)
-    : invoke<number>("pty_spawn", { cols: term.cols, rows: term.rows, onOutput: output }));
+  const spawnProcess = () => {
+    const output = new Channel<ArrayBuffer>();
+    output.onmessage = (chunk) => term.write(new Uint8Array(chunk));
+    return options.spawn
+      ? options.spawn(term.cols, term.rows, output)
+      : invoke<number>("pty_spawn", { cols: term.cols, rows: term.rows, onOutput: output });
+  };
+  let id = await spawnProcess();
+  let alive = true;
 
   const unlistenExit = await listen<PtyExit>("pty-exit", (event) => {
-    if (event.payload.id === id) handlers.onExit(event.payload.code);
+    if (event.payload.id !== id || !alive) return;
+    alive = false;
+    running = false;
+    handlers.onExit(event.payload.code);
   });
 
   const dataSub = term.onData((data) => {
-    invoke("pty_write", { id, data });
+    if (alive) invoke("pty_write", { id, data });
+    else handlers.onInputWhileStopped?.(data);
   });
   const resizeSub = term.onResize(({ cols, rows }) => {
-    invoke("pty_resize", { id, cols, rows });
+    if (alive) invoke("pty_resize", { id, cols, rows });
   });
 
   let fitFrame = 0;
@@ -191,7 +204,9 @@ export async function openTerminalSession(
 
   term.focus();
 
-  write = (data: string) => invoke("pty_write", { id, data });
+  write = (data: string) => {
+    if (alive) invoke("pty_write", { id, data });
+  };
 
   const session: TerminalSession = {
     term,
@@ -207,6 +222,20 @@ export async function openTerminalSession(
       }
       term.scrollToBottom();
     },
+    async restart() {
+      if (alive) {
+        alive = false;
+        await invoke("pty_kill", { id }).catch(() => {});
+      }
+      running = false;
+      ime.reset();
+      id = await spawnProcess();
+      alive = true;
+    },
+    notice(text) {
+      // Start on a fresh line; the remote side may have left the cursor anywhere.
+      term.write(`\x1b[0m\r\n\x1b[2m${text}\x1b[0m\r\n`);
+    },
     focus: () => term.focus(),
     dispose() {
       observer.disconnect();
@@ -218,7 +247,7 @@ export async function openTerminalSession(
       dataSub.dispose();
       resizeSub.dispose();
       unlistenExit();
-      invoke("pty_kill", { id });
+      if (alive) invoke("pty_kill", { id });
       term.dispose();
     },
   };

@@ -9,6 +9,7 @@ import {
   type Transport,
 } from "./command-validation";
 import { showToast } from "./toast";
+import { checkReachable } from "./reachability";
 
 interface CommandsFile {
   version: number;
@@ -51,6 +52,7 @@ const FIELDS: FieldSpec[] = [
     label: "SSH 호스트",
     for: "ssh-profile",
     placeholder: "user@home-laptop.tailnet.ts.net",
+    hint: "원격 노트북이 잠들면 접속할 수 없습니다. 그쪽에서 시스템 설정 › 배터리 › 옵션의 '네트워크 접근 시 깨우기'를 켜거나 caffeinate -s를 실행해 두세요",
     mono: true,
   },
   {
@@ -188,7 +190,18 @@ export class CommandManager {
 
       if (ssh) {
         const avatar = el("div", "host-avatar", initials(c));
-        avatar.append(el("span", "h-status unknown"));
+        const dot = el("span", "h-status unknown");
+        dot.title = "확인 중…";
+        avatar.append(dot);
+        void checkReachable(c.id).then((r) => {
+          dot.className = `h-status ${r.state}`;
+          dot.title =
+            r.state === "online"
+              ? "온라인"
+              : r.state === "offline"
+                ? `오프라인 · ${r.reason}`
+                : "프록시 경유라 미리 확인할 수 없습니다";
+        });
         const connect = el("span", "cr-connect", "접속");
         connect.title = `${c.sshHost}에 접속`;
         connect.addEventListener("click", (e) => {
@@ -297,7 +310,15 @@ export class CommandManager {
     select.addEventListener("change", () => {
       this.draft.transport = select.value as Transport;
     });
-    field.append(label, select);
+    field.append(
+      label,
+      select,
+      el(
+        "div",
+        "field-hint",
+        "Mosh는 Wi-Fi가 바뀌거나 잠깐 끊겨도 세션이 유지됩니다. 이 Mac에도 mosh가 있어야 합니다 (brew install mosh)",
+      ),
+    );
     return field;
   }
 

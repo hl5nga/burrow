@@ -24,7 +24,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_take_recoveries,
         stats::stats_record,
         stats::stats_top,
-        remote::remote_hook_status,
+        remote::remote_probe,
+        remote::remote_reachable,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
         devctl::dev_log,
@@ -43,7 +44,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_take_recoveries,
         stats::stats_record,
         stats::stats_top,
-        remote::remote_hook_status,
+        remote::remote_probe,
+        remote::remote_reachable,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
     ]
@@ -63,6 +65,7 @@ pub fn run() {
                 Err(e) => eprintln!("hooks: cannot install zsh wrappers: {e}"),
             }
             app.manage(store);
+            remote::watch_network(app.handle().clone());
             #[cfg(debug_assertions)]
             devctl::start(app.handle().clone());
             Ok(())
