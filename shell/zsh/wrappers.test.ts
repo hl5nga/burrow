@@ -96,3 +96,24 @@ test("nothing is written into the wrapper directory", () => {
     assert.match(readFileSync(join(home, ".zsh_history"), "utf8"), /recorded/);
   });
 });
+
+test("the git branch is read without running git", () => {
+  withHome({}, (home) => {
+    mkdirSync(join(home, "repo/.git"), { recursive: true });
+    mkdirSync(join(home, "repo/src/deep"), { recursive: true });
+    writeFileSync(join(home, "repo/.git/HEAD"), "ref: refs/heads/feature/login\n");
+    mkdirSync(join(home, "wt"), { recursive: true });
+    mkdirSync(join(home, "repo/.git/worktrees/wt"), { recursive: true });
+    writeFileSync(join(home, "repo/.git/worktrees/wt/HEAD"), "3f9a2c1d8e7b6a5\n");
+    writeFileSync(join(home, "wt/.git"), `gitdir: ${join(home, "repo/.git/worktrees/wt")}\n`);
+
+    const branch = (dir: string) =>
+      runThroughWrappers(home, `cd ${dir} && print -r -- "[$(__burrow_git_branch)]"`)
+        .trim()
+        .split("\n")
+        .pop();
+    assert.equal(branch(join(home, "repo/src/deep")), "[feature/login]");
+    assert.equal(branch(join(home, "wt")), "[3f9a2c1]");
+    assert.equal(branch(home), "[]");
+  });
+});

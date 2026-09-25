@@ -1,0 +1,91 @@
+/* The decoration element is one cell wide; the bar itself sits in the padding
+   to the left of the text so it never covers characters. */
+.block-bar {
+  pointer-events: none;
+}
+
+.block-bar::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: -9px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.block-bar.ok::before {
+  background: var(--success);
+  opacity: 0.55;
+}
+
+.block-bar.err::before {
+  background: #ff6259;
+  opacity: 0.8;
+}
+
+.block-bar.active::before {
+  background: var(--amber);
+  box-shadow: 0 0 6px rgba(255, 176, 0, 0.35);
+}
+
+.block-meta-host {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  pointer-events: none;
+}
+
+.block-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.block-info {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.block-info .exit-ok {
+  color: var(--success);
+}
+
+.block-info .exit-err {
+  color: #ff6259;
+}
+
+.block-actions {
+  display: none;
+  gap: 3px;
+}
+
+.block-meta:hover .block-actions {
+  display: flex;
+}
+
+.block-actions button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 18px;
+  font-size: 11px;
+  color: var(--text-mid);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: default;
+}
+
+.block-actions button:hover {
+  color: var(--amber);
+  border-color: rgba(255, 176, 0, 0.35);
+}

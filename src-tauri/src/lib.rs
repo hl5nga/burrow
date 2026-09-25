@@ -1,6 +1,7 @@
 #[cfg(debug_assertions)]
 mod devctl;
 mod hooks;
+mod menu;
 mod pty;
 mod stats;
 mod store;
@@ -46,6 +47,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(pty::PtyState::default())
+        .menu(menu::build)
         .setup(|app| {
             let store = Arc::new(store::Store::open(store::default_root())?);
             store.start_stats_flusher();

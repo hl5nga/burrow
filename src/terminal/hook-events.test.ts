@@ -16,13 +16,19 @@ test("exec events keep commands with separators, quotes and Hangul intact", () =
   assert.deepEqual(event, { type: "exec", host: "MacProFX", cwd: "/tmp/a;b c", cmd });
 });
 
-test("prompt events carry the exit status", () => {
-  assert.deepEqual(parseHookEvent(`prompt;${zshPayload("h", "/", "127")}`), {
+test("prompt events carry the exit status and git branch", () => {
+  assert.deepEqual(parseHookEvent(`prompt;${zshPayload("h", "/", "127", "feature/x")}`), {
     type: "prompt",
     host: "h",
     cwd: "/",
     exit: 127,
+    branch: "feature/x",
   });
+  // Hooks installed on a remote host by an older Burrow send no branch.
+  assert.equal(
+    (parseHookEvent(`prompt;${zshPayload("h", "/", "0")}`) as { branch: string }).branch,
+    "",
+  );
 });
 
 test("multi-line commands survive", () => {

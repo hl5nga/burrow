@@ -7,6 +7,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { installImeHandler } from "./ime";
 import { installInputEventLog } from "./devlog";
 import { HOOK_OSC, parseHookEvent, type HookEvent } from "./hook-events";
+import { BlockTracker } from "./blocks";
 
 interface PtyExit {
   id: number;
@@ -67,6 +68,8 @@ export interface SessionContext {
   /** Key used for this session in stats.json: "local" for local shells. */
   host: string;
   cwd: string;
+  /** Git branch of cwd, "" outside a repository. */
+  branch: string;
 }
 
 export interface SessionHandlers {
@@ -97,21 +100,29 @@ export async function openTerminalSession(
   term.unicode.activeVersion = "11";
   term.open(container);
 
-  const context: SessionContext = { host: "local", cwd: "" };
+  const context: SessionContext = { host: "local", cwd: "", branch: "" };
   let running = false;
+  let write: (data: string) => void = () => {};
+  const blocks = new BlockTracker(term, {
+    rerun: (cmd) => session.run(cmd),
+  });
   // Consumed before rendering, so hook events never show up on screen.
   const hookOsc = term.parser.registerOscHandler(HOOK_OSC, (data) => {
     const event = parseHookEvent(data);
     if (!event) return true;
-    if (event.cwd !== context.cwd) {
+    const branch = event.type === "prompt" ? event.branch : context.branch;
+    if (event.cwd !== context.cwd || branch !== context.branch) {
       context.cwd = event.cwd;
+      context.branch = branch;
       handlers.onContext?.({ ...context });
     }
     if (event.type === "exec") {
       running = true;
+      blocks.onExec(event.cmd, context.host, event.cwd);
       invoke("stats_record", { host: context.host, cwd: event.cwd, cmd: event.cmd });
     } else {
       running = false;
+      blocks.onPrompt(event.exit);
     }
     handlers.onHookEvent?.(event);
     return true;
@@ -163,9 +174,9 @@ export async function openTerminalSession(
 
   term.focus();
 
-  const write = (data: string) => invoke("pty_write", { id, data });
+  write = (data: string) => invoke("pty_write", { id, data });
 
-  return {
+  const session: TerminalSession = {
     term,
     context: () => ({ ...context }),
     isRunning: () => running,
@@ -183,6 +194,7 @@ export async function openTerminalSession(
     dispose() {
       observer.disconnect();
       hookOsc.dispose();
+      blocks.dispose();
       ime.dispose();
       removeDevLog();
       document.fonts.removeEventListener("loadingdone", onFontsLoaded);
@@ -193,4 +205,5 @@ export async function openTerminalSession(
       term.dispose();
     },
   };
+  return session;
 }

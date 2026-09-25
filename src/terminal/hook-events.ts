@@ -4,7 +4,7 @@
  */
 export type HookEvent =
   | { type: "exec"; host: string; cwd: string; cmd: string }
-  | { type: "prompt"; host: string; cwd: string; exit: number };
+  | { type: "prompt"; host: string; cwd: string; exit: number; branch: string };
 
 export const HOOK_OSC = 9999;
 
@@ -30,10 +30,10 @@ export function parseHookEvent(data: string): HookEvent | undefined {
     const [host, cwd, cmd] = fields;
     return { type: "exec", host, cwd, cmd };
   }
-  if (event === "prompt" && fields.length === 3) {
-    const [host, cwd, exit] = fields;
+  if (event === "prompt" && (fields.length === 3 || fields.length === 4)) {
+    const [host, cwd, exit, branch = ""] = fields;
     const code = Number(exit);
-    return { type: "prompt", host, cwd, exit: Number.isInteger(code) ? code : -1 };
+    return { type: "prompt", host, cwd, exit: Number.isInteger(code) ? code : -1, branch };
   }
   return undefined;
 }
