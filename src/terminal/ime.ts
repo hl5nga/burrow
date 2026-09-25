@@ -1,15 +1,27 @@
 import type { Terminal } from "@xterm/xterm";
+import { DEL, ImeLineSync } from "./ime-sync";
 
 /**
- * Replaces xterm.js's composition handling, which drops Hangul syllables in
- * WKWebView: when one syllable ends and the next begins in the same keystroke,
- * WebKit's compositionend/compositionstart ordering breaks xterm's
- * setTimeout-based textarea slicing.
+ * Replaces xterm.js's IME handling, which loses Hangul in WKWebView.
  *
- * Instead the textarea is treated as the source of truth: everything in it
- * except the in-progress composition (always at the end, since the caret never
- * moves) is committed text, and only the not-yet-sent part is forwarded.
+ * Observed in WKWebView (dev builds log raw events to $TMPDIR/burrow-dev-events.log):
+ * the macOS Korean IME fires no composition events at all. It inserts the first
+ * jamo as plain `insertText`, then edits the text already in the field with
+ * `insertReplacementText` ("ㄹ" → "러", "하" → "한" → "하"+"나"). That only works
+ * if the previous characters are still in the textarea and it sits at a real
+ * caret position — xterm parks it off-screen at zero size and empties it.
+ *
+ * So the textarea is kept at the cursor with its text left in place, and it is
+ * the source of truth: after every change the part that differs from what was
+ * already sent is rewritten on the shell line (DEL per changed character, then
+ * the new text). IMEs that do use composition events are handled too — the
+ * in-progress composition at the end is excluded until it commits.
  */
+
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "Fn"]);
+const TEXTAREA_TRIM_AT = 256;
+const TEXTAREA_KEEP = 32;
+
 function keySequence(term: Terminal, e: KeyboardEvent): string | undefined {
   if (e.metaKey || e.ctrlKey || e.altKey) return undefined;
   const app = term.modes.applicationCursorKeysMode;
@@ -20,7 +32,7 @@ function keySequence(term: Terminal, e: KeyboardEvent): string | undefined {
     case "Tab":
       return "\t";
     case "Backspace":
-      return "\x7f";
+      return DEL;
     case "Escape":
       return "\x1b";
     case "ArrowUp":
@@ -44,48 +56,76 @@ export function installImeHandler(term: Terminal, container: HTMLElement): () =>
 
   let composing = false;
   let composition = "";
-  let sent = 0;
-  // Keys pressed while a syllable is still being composed; replayed after it commits.
+  const sync = new ImeLineSync();
+  // Keys pressed while a composition-event IME is still composing; replayed after commit.
   let pendingKeys: string[] = [];
+  // The character of the last keydown xterm sent itself (e.g. space). If the browser
+  // then also inserts that same text into the textarea, it was already sent.
+  let xtermSentKey: string | undefined;
+
+  const cellGeometry = () => {
+    const screen = container.querySelector<HTMLElement>(".xterm-screen");
+    if (!screen) return undefined;
+    const buffer = term.buffer.active;
+    const width = screen.clientWidth / term.cols;
+    const height = screen.clientHeight / term.rows;
+    const x = Math.min(buffer.cursorX, term.cols - 1);
+    return { screen, width, height, left: x * width, top: buffer.cursorY * height };
+  };
+
+  // The IME needs a real caret rectangle (and its candidate window a position),
+  // so the textarea follows the cursor instead of sitting at -9999em.
+  const syncTextarea = () => {
+    const cell = cellGeometry();
+    if (!cell) return;
+    textarea.style.left = `${cell.left}px`;
+    textarea.style.top = `${cell.top}px`;
+    textarea.style.width = `${cell.width * 2}px`;
+    textarea.style.height = `${cell.height}px`;
+    textarea.style.lineHeight = `${cell.height}px`;
+  };
+
+  const keepCaretAtEnd = () => {
+    if (composing) return;
+    const end = textarea.value.length;
+    textarea.setSelectionRange(end, end);
+  };
+
+  const resetContext = () => {
+    textarea.value = "";
+    sync.reset();
+  };
 
   const flush = () => {
     const value = textarea.value;
-    if (value.length < sent) sent = 0;
-    const committedEnd = composing
-      ? Math.max(sent, value.length - composition.length)
-      : value.length;
-    if (committedEnd > sent) {
-      // A textarea newline from a composition-committing Enter means Return to the shell.
-      term.input(value.slice(sent, committedEnd).replace(/\n/g, "\r"), true);
-      sent = committedEnd;
-    }
+    const committed =
+      composing && composition ? value.slice(0, value.length - composition.length) : value;
+    const data = sync.update(committed);
+    if (data) term.input(data, true);
+
     if (!composing && pendingKeys.length > 0) {
       term.input(pendingKeys.join(""), true);
       pendingKeys = [];
     }
-    if (!composing && sent === value.length && value.length > 0) {
-      textarea.value = "";
-      sent = 0;
+    if (!composing) {
+      const trimmed = sync.trim(TEXTAREA_TRIM_AT, TEXTAREA_KEEP);
+      if (trimmed !== undefined) textarea.value = trimmed;
     }
+    keepCaretAtEnd();
   };
-  const scheduleFlush = () => setTimeout(flush, 0);
 
   const updatePreview = () => {
     const buffer = term.buffer.active;
-    if (!composing || !composition || buffer.viewportY !== buffer.baseY) {
+    const cell = cellGeometry();
+    if (!cell || !composing || !composition || buffer.viewportY !== buffer.baseY) {
       preview.classList.remove("active");
       return;
     }
-    const screen = container.querySelector<HTMLElement>(".xterm-screen");
-    if (!screen) return;
-    const cellWidth = screen.clientWidth / term.cols;
-    const cellHeight = screen.clientHeight / term.rows;
-    const x = Math.min(buffer.cursorX, term.cols - 1);
     preview.textContent = composition;
-    preview.style.left = `${screen.offsetLeft + x * cellWidth}px`;
-    preview.style.top = `${screen.offsetTop + buffer.cursorY * cellHeight}px`;
-    preview.style.height = `${cellHeight}px`;
-    preview.style.lineHeight = `${cellHeight}px`;
+    preview.style.left = `${cell.screen.offsetLeft + cell.left}px`;
+    preview.style.top = `${cell.screen.offsetTop + cell.top}px`;
+    preview.style.height = `${cell.height}px`;
+    preview.style.lineHeight = `${cell.height}px`;
     preview.style.fontFamily = term.options.fontFamily ?? "";
     preview.style.fontSize = `${term.options.fontSize}px`;
     preview.classList.add("active");
@@ -100,7 +140,6 @@ export function installImeHandler(term: Terminal, container: HTMLElement): () =>
         e.stopPropagation();
         composing = true;
         composition = "";
-        scheduleFlush();
       },
     ],
     [
@@ -118,16 +157,19 @@ export function installImeHandler(term: Terminal, container: HTMLElement): () =>
         composing = false;
         composition = "";
         updatePreview();
-        scheduleFlush();
+        setTimeout(flush, 0);
       },
     ],
     [
-      // Plain ASCII typing never reaches here: xterm handles it on keydown and
-      // prevents the default. Only IME, emoji picker and dictation insert text.
       "input",
       (e) => {
         e.stopPropagation();
-        scheduleFlush();
+        if (!composing && xtermSentKey && (e as InputEvent).data === xtermSentKey) {
+          xtermSentKey = undefined;
+          sync.adopt(textarea.value);
+          return;
+        }
+        flush();
       },
     ],
     [
@@ -135,24 +177,45 @@ export function installImeHandler(term: Terminal, container: HTMLElement): () =>
       (e) => {
         const ke = e as KeyboardEvent;
         if (ke.isComposing || ke.keyCode === 229) {
+          // The IME owns this key; it reports the result as textarea edits.
           e.stopPropagation();
           return;
         }
-        const seq = composing ? keySequence(term, ke) : undefined;
-        if (seq) {
-          e.stopPropagation();
-          e.preventDefault();
-          pendingKeys.push(seq);
-          scheduleFlush();
+        if (MODIFIER_KEYS.has(ke.key)) return;
+        if (composing) {
+          const seq = keySequence(term, ke);
+          if (seq) {
+            e.stopPropagation();
+            e.preventDefault();
+            pendingKeys.push(seq);
+            setTimeout(flush, 0);
+          }
+          return;
         }
+        // From here on xterm handles the key and sends it to the shell itself.
+        if (ke.key === "Backspace" && !ke.metaKey && !ke.altKey && !ke.ctrlKey) {
+          // Mirror the shell's deletion so textarea and shell line stay aligned.
+          textarea.value = sync.backspace();
+          return;
+        }
+        // Anything else (Enter, arrows, other characters) breaks the link between
+        // the textarea and the end of the shell line, so start a fresh context.
+        resetContext();
+        xtermSentKey = ke.key.length === 1 && !ke.metaKey && !ke.ctrlKey ? ke.key : undefined;
       },
     ],
+    ["keyup", () => keepCaretAtEnd()],
   ];
 
   for (const [type, fn] of listeners) container.addEventListener(type, fn, true);
+  const cursorSub = term.onCursorMove(syncTextarea);
+  const renderSub = term.onRender(syncTextarea);
+  syncTextarea();
 
   return () => {
     for (const [type, fn] of listeners) container.removeEventListener(type, fn, true);
+    cursorSub.dispose();
+    renderSub.dispose();
     preview.remove();
   };
 }
