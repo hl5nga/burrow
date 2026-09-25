@@ -1,0 +1,406 @@
+//! Shapes of the JSON files under `~/.burrow`. Every struct tolerates missing
+//! fields (`#[serde(default)]`) and unknown ones so hand-edited files still load.
+
+use std::collections::HashMap;
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+pub const CURRENT_VERSION: u32 = 1;
+
+fn current_version() -> u32 {
+    CURRENT_VERSION
+}
+
+pub trait StoreFile: Serialize + DeserializeOwned + Default + Send + 'static {
+    const FILE_NAME: &'static str;
+}
+
+// ---------- commands.json ----------
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CommandType {
+    #[default]
+    Shell,
+    SshProfile,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Transport {
+    #[default]
+    Auto,
+    Ssh,
+    Mosh,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Command {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub kind: CommandType,
+    pub ssh_host: Option<String>,
+    pub tmux_session: Option<String>,
+    pub transport: Transport,
+    pub vpn_pre_connect: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CommandsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub commands: Vec<Command>,
+}
+
+impl Default for CommandsFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            commands: Vec::new(),
+        }
+    }
+}
+
+impl StoreFile for CommandsFile {
+    const FILE_NAME: &'static str = "commands.json";
+}
+
+// ---------- stats.json ----------
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HostStats {
+    pub global: HashMap<String, u64>,
+    pub by_dir: HashMap<String, HashMap<String, u64>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub hosts: HashMap<String, HostStats>,
+}
+
+impl Default for StatsFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            hosts: HashMap::from([("local".into(), HostStats::default())]),
+        }
+    }
+}
+
+impl StoreFile for StatsFile {
+    const FILE_NAME: &'static str = "stats.json";
+}
+
+// ---------- config.json ----------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ConfigFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub promotion_threshold: u32,
+}
+
+impl Default for ConfigFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            promotion_threshold: 5,
+        }
+    }
+}
+
+impl StoreFile for ConfigFile {
+    const FILE_NAME: &'static str = "config.json";
+}
+
+// ---------- agent-patterns.json ----------
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AgentPattern {
+    pub waiting_approval: Vec<String>,
+    pub working: Vec<String>,
+    pub error: Vec<String>,
+}
+
+/// Tool presets arrive with the agent dashboard (T14); until then the file is empty.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AgentPatternsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub tools: HashMap<String, AgentPattern>,
+}
+
+impl Default for AgentPatternsFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            tools: HashMap::new(),
+        }
+    }
+}
+
+impl StoreFile for AgentPatternsFile {
+    const FILE_NAME: &'static str = "agent-patterns.json";
+}
+
+// ---------- guardrails.json ----------
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    #[default]
+    Warn,
+    Block,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GuardrailRule {
+    pub id: String,
+    pub pattern: String,
+    pub severity: Severity,
+    pub label: String,
+    pub enabled: bool,
+}
+
+impl Default for GuardrailRule {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            pattern: String::new(),
+            severity: Severity::Warn,
+            label: String::new(),
+            enabled: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GuardrailsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub rules: Vec<GuardrailRule>,
+}
+
+fn rule(id: &str, pattern: &str, severity: Severity, label: &str) -> GuardrailRule {
+    GuardrailRule {
+        id: id.into(),
+        pattern: pattern.into(),
+        severity,
+        label: label.into(),
+        enabled: true,
+    }
+}
+
+impl Default for GuardrailsFile {
+    fn default() -> Self {
+        use Severity::{Block, Warn};
+        // zsh `=~` uses POSIX ERE, so no \s, \b or lookarounds here.
+        Self {
+            version: CURRENT_VERSION,
+            rules: vec![
+                rule(
+                    "preset-rm-rf-root-home",
+                    r"rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f?[a-zA-Z]*[[:space:]]+(/|~|\$HOME)([[:space:]]|/?$)",
+                    Block,
+                    "루트·홈 디렉토리 재귀 삭제",
+                ),
+                rule(
+                    "preset-git-force-push",
+                    r"git[[:space:]]+push([[:space:]].*)?[[:space:]](--force|-f)([[:space:]]|$)",
+                    Block,
+                    "git 강제 푸시",
+                ),
+                rule(
+                    "preset-sql-drop",
+                    r"[Dd][Rr][Oo][Pp][[:space:]]+([Tt][Aa][Bb][Ll][Ee]|[Dd][Aa][Tt][Aa][Bb][Aa][Ss][Ee])",
+                    Warn,
+                    "DB 테이블·데이터베이스 삭제",
+                ),
+                rule(
+                    "preset-kubectl-delete-all",
+                    r"kubectl[[:space:]]+delete([[:space:]].*)?[[:space:]]--all",
+                    Block,
+                    "kubectl 전체 삭제",
+                ),
+                rule(
+                    "preset-mkfs",
+                    r"(^|[[:space:];&|])mkfs",
+                    Block,
+                    "파일시스템 포맷",
+                ),
+                rule(
+                    "preset-dd-device",
+                    r"dd[[:space:]].*of=/dev/",
+                    Block,
+                    "디스크 장치에 직접 쓰기",
+                ),
+                rule(
+                    "preset-chmod-777-root",
+                    r"chmod[[:space:]]+-R[[:space:]]+777[[:space:]]+/([[:space:]]|$)",
+                    Block,
+                    "루트 전체 권한 개방",
+                ),
+                rule(
+                    "preset-docker-prune-all",
+                    r"docker[[:space:]]+system[[:space:]]+prune([[:space:]].*)?[[:space:]]-a",
+                    Warn,
+                    "Docker 이미지·컨테이너 전체 정리",
+                ),
+                rule(
+                    "preset-terraform-destroy",
+                    r"terraform[[:space:]]+destroy",
+                    Block,
+                    "Terraform 인프라 삭제",
+                ),
+            ],
+        }
+    }
+}
+
+impl StoreFile for GuardrailsFile {
+    const FILE_NAME: &'static str = "guardrails.json";
+}
+
+// ---------- secrets-patterns.json ----------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SecretPattern {
+    pub id: String,
+    pub pattern: String,
+    pub label: String,
+    pub enabled: bool,
+}
+
+impl Default for SecretPattern {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            pattern: String::new(),
+            label: String::new(),
+            enabled: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SecretsPatternsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub patterns: Vec<SecretPattern>,
+}
+
+fn secret(id: &str, pattern: &str, label: &str) -> SecretPattern {
+    SecretPattern {
+        id: id.into(),
+        pattern: pattern.into(),
+        label: label.into(),
+        enabled: true,
+    }
+}
+
+impl Default for SecretsPatternsFile {
+    fn default() -> Self {
+        // Matched in the frontend with JavaScript regular expressions.
+        Self {
+            version: CURRENT_VERSION,
+            patterns: vec![
+                secret(
+                    "preset-aws-access-key",
+                    r"AKIA[0-9A-Z]{16}",
+                    "AWS 액세스 키",
+                ),
+                secret(
+                    "preset-github-token",
+                    r"gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}",
+                    "GitHub 토큰",
+                ),
+                secret(
+                    "preset-slack-token",
+                    r"xox[baprs]-[A-Za-z0-9-]{10,}",
+                    "Slack 토큰",
+                ),
+                secret(
+                    "preset-private-key",
+                    r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+                    "개인 키 블록",
+                ),
+                secret(
+                    "preset-env-secret",
+                    r"\b[A-Za-z0-9_]*(SECRET|TOKEN|PASSWORD|API_KEY|Secret|Token|Password|secret|token|password|api_key)[A-Za-z0-9_]*\s*=\s*\S+",
+                    ".env 형식 비밀 값",
+                ),
+            ],
+        }
+    }
+}
+
+impl StoreFile for SecretsPatternsFile {
+    const FILE_NAME: &'static str = "secrets-patterns.json";
+}
+
+// ---------- keybindings.json ----------
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Keybinding {
+    pub action: String,
+    pub keys: String,
+    pub disable_in_alt_screen: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct KeybindingsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub bindings: Vec<Keybinding>,
+}
+
+fn bind(action: &str, keys: &str) -> Keybinding {
+    Keybinding {
+        action: action.into(),
+        keys: keys.into(),
+        disable_in_alt_screen: false,
+    }
+}
+
+impl Default for KeybindingsFile {
+    fn default() -> Self {
+        let mut bindings = vec![
+            bind("toggle-command-palette", "Cmd+K"),
+            bind("toggle-frequent-panel", "Cmd+J"),
+            bind("new-tab", "Cmd+T"),
+            bind("close-tab", "Cmd+W"),
+            bind("next-tab", "Cmd+Shift+]"),
+            bind("previous-tab", "Cmd+Shift+["),
+            bind("search-scrollback", "Cmd+F"),
+            bind("open-command-manager", "Cmd+,"),
+            bind("split-pane", "Cmd+D"),
+        ];
+        bindings.extend((1..=9).map(|n| bind(&format!("select-tab-{n}"), &format!("Cmd+{n}"))));
+        Self {
+            version: CURRENT_VERSION,
+            bindings,
+        }
+    }
+}
+
+impl StoreFile for KeybindingsFile {
+    const FILE_NAME: &'static str = "keybindings.json";
+}

@@ -1,6 +1,9 @@
 #[cfg(debug_assertions)]
 mod devctl;
 mod pty;
+mod store;
+
+use std::sync::Arc;
 
 use tauri::{Manager, RunEvent};
 
@@ -11,6 +14,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         pty::pty_write,
         pty::pty_resize,
         pty::pty_kill,
+        store::store_get,
+        store::store_put,
+        store::store_take_recoveries,
         devctl::dev_log,
     ]
 }
@@ -22,6 +28,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         pty::pty_write,
         pty::pty_resize,
         pty::pty_kill,
+        store::store_get,
+        store::store_put,
+        store::store_take_recoveries,
     ]
 }
 
@@ -30,9 +39,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(pty::PtyState::default())
-        .setup(|_app| {
+        .setup(|app| {
+            let store = Arc::new(store::Store::open(store::default_root())?);
+            store.start_stats_flusher();
+            app.manage(store);
             #[cfg(debug_assertions)]
-            devctl::start(_app.handle().clone());
+            devctl::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(invoke_handler())
@@ -41,6 +53,9 @@ pub fn run() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 app.state::<pty::PtyState>().kill_all();
+                if let Err(e) = app.state::<Arc<store::Store>>().flush_stats() {
+                    eprintln!("store: cannot write stats on exit: {e}");
+                }
                 #[cfg(debug_assertions)]
                 let _ = std::fs::remove_file(devctl::socket_path());
             }

@@ -9,6 +9,8 @@
   --text-dim: #5b6167;
   --success: #54d68a;
   --mono: "JetBrains Mono", "Burrow Hangul", ui-monospace, monospace;
+  /* Prose in panels and toasts; the monospace stack is only for terminal-like text. */
+  --ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
 
   --titlebar-h: 38px;
   --statusbar-h: 26px;
@@ -165,4 +167,31 @@ body::after {
 
 .ime-preview.active {
   display: block;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--statusbar-h) + 12px);
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.toast {
+  padding: 10px 14px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-hi);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  user-select: text;
+  -webkit-user-select: text;
 }

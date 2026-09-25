@@ -4,6 +4,7 @@ import "@fontsource/jetbrains-mono/700.css";
 import "./styles/fonts.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openTerminalSession } from "./terminal/session";
+import { showStoreRecoveries } from "./ui/toast";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 
@@ -28,3 +29,5 @@ openTerminalSession(host, () => {
 }).catch((err) => {
   host.textContent = `터미널을 시작하지 못했습니다: ${err}`;
 });
+
+showStoreRecoveries();
