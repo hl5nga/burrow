@@ -17,6 +17,8 @@ interface Ranked {
 }
 
 interface Entry {
+  /** Set for registered commands, which ⌘E opens in the manager. */
+  commandId?: string;
   section: string;
   title: string;
   subtitle: string;
@@ -56,7 +58,10 @@ export class CommandPalette {
   private visible: Entry[] = [];
   private selected = 0;
 
-  constructor(private readonly getSession: () => TerminalSession | undefined) {
+  constructor(
+    private readonly getSession: () => TerminalSession | undefined,
+    private readonly editCommand: (id: string) => void,
+  ) {
     const box = el("div", "palette");
     const search = el("div", "palette-search");
     this.input.placeholder = "명령어 검색 — 초성(ㅂㅍ)도 됩니다";
@@ -68,6 +73,7 @@ export class CommandPalette {
     for (const [key, label] of [
       ["↑↓", "이동"],
       ["↵", "실행"],
+      ["⌘E", "편집"],
     ]) {
       const hint = el("span");
       hint.append(el("b", undefined, key), label);
@@ -126,6 +132,7 @@ export class CommandPalette {
     this.footerNote.textContent = `${config.promotionThreshold}회 이상 쓴 명령이 자동으로 올라옵니다`;
 
     const registered: Entry[] = commandsFile.commands.map((c) => ({
+      commandId: c.id,
       section: "사용자 등록 명령어",
       title: c.name || c.command,
       subtitle: c.type === "ssh-profile" ? (c.sshHost ?? "") : c.command,
@@ -251,11 +258,26 @@ export class CommandPalette {
         e.preventDefault();
         this.close();
         break;
+      case "e":
+      case "E":
+        if (e.metaKey) {
+          e.preventDefault();
+          this.editSelected();
+        }
+        break;
     }
   }
 
   private scrollSelected() {
     this.results.querySelector(".palette-item.hi")?.scrollIntoView({ block: "nearest" });
+  }
+
+  /** ⌘E: edit a registered command, or register a frequent one. */
+  private editSelected() {
+    const entry = this.visible[this.selected];
+    if (!entry) return;
+    this.overlay.hidden = true;
+    this.editCommand(entry.commandId ?? `new:${entry.run}`);
   }
 
   private runSelected() {

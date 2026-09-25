@@ -6,8 +6,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openTerminalSession, type TerminalSession } from "./terminal/session";
 import { CommandPalette } from "./ui/palette";
 import { FrequentPanel } from "./ui/frequent-panel";
+import { CommandManager } from "./ui/command-manager";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
+import "./styles/command-manager.css";
 import { showStoreRecoveries } from "./ui/toast";
 
 const app = document.querySelector<HTMLElement>("#app")!;
@@ -33,7 +35,11 @@ const host = app.querySelector<HTMLElement>(".term-host")!;
 const cwdLabel = app.querySelector<HTMLElement>(".statusbar .cwd")!;
 
 let session: TerminalSession | undefined;
-const palette = new CommandPalette(() => session);
+const manager = new CommandManager();
+const palette = new CommandPalette(
+  () => session,
+  (id) => manager.open(id, () => session?.focus()),
+);
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, () => session);
 
 // Matched on the physical key so the shortcut still works with a Korean input source.
@@ -45,6 +51,11 @@ window.addEventListener(
       e.preventDefault();
       e.stopPropagation();
       palette.toggle();
+    } else if (e.code === "Comma") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (manager.isOpen) manager.close();
+      else void manager.open(undefined, () => session?.focus());
     } else if (e.code === "KeyJ") {
       e.preventDefault();
       e.stopPropagation();
