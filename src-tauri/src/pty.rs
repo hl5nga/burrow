@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Mutex, OnceLock};
@@ -62,9 +63,24 @@ fn default_shell() -> String {
         .unwrap_or_else(|| "/bin/zsh".into())
 }
 
+static HOOK_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Directory holding the zsh wrappers from `hooks::install`.
+pub fn set_hook_dir(dir: PathBuf) {
+    let _ = HOOK_DIR.set(dir);
+}
+
 fn build_command() -> CommandBuilder {
-    let mut cmd = CommandBuilder::new(default_shell());
+    let shell = default_shell();
+    let mut cmd = CommandBuilder::new(&shell);
     cmd.arg("-l");
+    cmd.env_remove("BURROW_USER_ZDOTDIR");
+    if let Some(dir) = HOOK_DIR.get().filter(|_| shell.ends_with("zsh")) {
+        if let Some(user) = std::env::var_os("ZDOTDIR") {
+            cmd.env("BURROW_USER_ZDOTDIR", user);
+        }
+        cmd.env("ZDOTDIR", dir);
+    }
     if let Some(home) = std::env::var_os("HOME") {
         cmd.cwd(home);
     }

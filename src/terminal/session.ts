@@ -6,6 +6,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { installImeHandler } from "./ime";
 import { installInputEventLog } from "./devlog";
+import { HOOK_OSC, parseHookEvent, type HookEvent } from "./hook-events";
 
 interface PtyExit {
   id: number;
@@ -53,9 +54,21 @@ export interface TerminalSession {
   dispose(): void;
 }
 
+export interface SessionContext {
+  /** Key used for this session in stats.json: "local" for local shells. */
+  host: string;
+  cwd: string;
+}
+
+export interface SessionHandlers {
+  onExit(code: number | null): void;
+  onContext?(context: SessionContext): void;
+  onHookEvent?(event: HookEvent): void;
+}
+
 export async function openTerminalSession(
   container: HTMLElement,
-  onExit: (code: number | null) => void,
+  handlers: SessionHandlers,
 ): Promise<TerminalSession> {
   const fontFamily = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim();
   await loadTerminalFonts(fontFamily);
@@ -74,6 +87,22 @@ export async function openTerminalSession(
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = "11";
   term.open(container);
+
+  const context: SessionContext = { host: "local", cwd: "" };
+  // Consumed before rendering, so hook events never show up on screen.
+  const hookOsc = term.parser.registerOscHandler(HOOK_OSC, (data) => {
+    const event = parseHookEvent(data);
+    if (!event) return true;
+    if (event.cwd !== context.cwd) {
+      context.cwd = event.cwd;
+      handlers.onContext?.({ ...context });
+    }
+    if (event.type === "exec") {
+      invoke("stats_record", { host: context.host, cwd: event.cwd, cmd: event.cmd });
+    }
+    handlers.onHookEvent?.(event);
+    return true;
+  });
   const removeIme = installImeHandler(term, container);
   const removeDevLog = import.meta.env.DEV ? installInputEventLog(term) : () => {};
 
@@ -102,7 +131,7 @@ export async function openTerminalSession(
   });
 
   const unlistenExit = await listen<PtyExit>("pty-exit", (event) => {
-    if (event.payload.id === id) onExit(event.payload.code);
+    if (event.payload.id === id) handlers.onExit(event.payload.code);
   });
 
   const dataSub = term.onData((data) => {
@@ -125,6 +154,7 @@ export async function openTerminalSession(
     term,
     dispose() {
       observer.disconnect();
+      hookOsc.dispose();
       removeIme();
       removeDevLog();
       document.fonts.removeEventListener("loadingdone", onFontsLoaded);

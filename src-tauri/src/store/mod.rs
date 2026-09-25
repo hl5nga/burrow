@@ -85,6 +85,10 @@ impl Store {
         }
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     fn path(&self, name: &str) -> PathBuf {
         self.root.join(name)
     }
@@ -150,8 +154,6 @@ impl Store {
         result
     }
 
-    // Not called until shell hook events start recording command usage.
-    #[allow(dead_code)]
     pub fn update_stats(&self, f: impl FnOnce(&mut StatsFile)) {
         f(&mut self.stats.lock().unwrap());
         self.stats_dirty.store(true, Ordering::Release);

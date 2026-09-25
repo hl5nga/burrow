@@ -1,6 +1,8 @@
 #[cfg(debug_assertions)]
 mod devctl;
+mod hooks;
 mod pty;
+mod stats;
 mod store;
 
 use std::sync::Arc;
@@ -17,6 +19,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_get,
         store::store_put,
         store::store_take_recoveries,
+        stats::stats_record,
+        stats::stats_top,
         devctl::dev_log,
     ]
 }
@@ -31,6 +35,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_get,
         store::store_put,
         store::store_take_recoveries,
+        stats::stats_record,
+        stats::stats_top,
     ]
 }
 
@@ -42,6 +48,10 @@ pub fn run() {
         .setup(|app| {
             let store = Arc::new(store::Store::open(store::default_root())?);
             store.start_stats_flusher();
+            match hooks::install(store.root()) {
+                Ok(dir) => pty::set_hook_dir(dir),
+                Err(e) => eprintln!("hooks: cannot install zsh wrappers: {e}"),
+            }
             app.manage(store);
             #[cfg(debug_assertions)]
             devctl::start(app.handle().clone());

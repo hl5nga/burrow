@@ -24,8 +24,13 @@ app.innerHTML = `
 
 const host = app.querySelector<HTMLElement>(".term-host")!;
 
-openTerminalSession(host, () => {
-  getCurrentWindow().close();
+const cwdLabel = app.querySelector<HTMLElement>(".statusbar .cwd")!;
+
+openTerminalSession(host, {
+  onExit: () => getCurrentWindow().close(),
+  onContext: ({ cwd }) => {
+    cwdLabel.textContent = cwd;
+  },
 }).catch((err) => {
   host.textContent = `터미널을 시작하지 못했습니다: ${err}`;
 });
