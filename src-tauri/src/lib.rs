@@ -4,6 +4,27 @@ mod pty;
 
 use tauri::{Manager, RunEvent};
 
+#[cfg(debug_assertions)]
+fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
+        pty::pty_spawn,
+        pty::pty_write,
+        pty::pty_resize,
+        pty::pty_kill,
+        devctl::dev_log,
+    ]
+}
+
+#[cfg(not(debug_assertions))]
+fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
+        pty::pty_spawn,
+        pty::pty_write,
+        pty::pty_resize,
+        pty::pty_kill,
+    ]
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -14,12 +35,7 @@ pub fn run() {
             devctl::start(_app.handle().clone());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            pty::pty_spawn,
-            pty::pty_write,
-            pty::pty_resize,
-            pty::pty_kill,
-        ])
+        .invoke_handler(invoke_handler())
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {

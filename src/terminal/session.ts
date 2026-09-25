@@ -4,6 +4,8 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { installImeHandler } from "./ime";
+import { installInputEventLog } from "./devlog";
 
 interface PtyExit {
   id: number;
@@ -72,6 +74,8 @@ export async function openTerminalSession(
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = "11";
   term.open(container);
+  const removeIme = installImeHandler(term, container);
+  const removeDevLog = import.meta.env.DEV ? installInputEventLog(term) : () => {};
 
   // A newly loaded glyph chunk would otherwise keep its fallback-font rendering
   // cached in the WebGL texture atlas.
@@ -121,6 +125,8 @@ export async function openTerminalSession(
     term,
     dispose() {
       observer.disconnect();
+      removeIme();
+      removeDevLog();
       document.fonts.removeEventListener("loadingdone", onFontsLoaded);
       dataSub.dispose();
       resizeSub.dispose();

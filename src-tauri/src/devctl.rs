@@ -21,6 +21,23 @@ enum Request {
     Quit,
 }
 
+pub fn log_path() -> std::path::PathBuf {
+    std::env::temp_dir().join("burrow-dev-events.log")
+}
+
+/// Frontend diagnostics (e.g. raw IME event sequences) appended to [`log_path`].
+#[tauri::command]
+pub fn dev_log(line: String) {
+    use std::fs::OpenOptions;
+    if let Ok(mut f) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path())
+    {
+        let _ = writeln!(f, "{line}");
+    }
+}
+
 pub fn socket_path() -> std::path::PathBuf {
     std::env::temp_dir().join("burrow-dev.sock")
 }
