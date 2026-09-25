@@ -84,7 +84,7 @@ export class CommandManager {
   private deleteArmed = false;
   private onClose: () => void = () => {};
 
-  constructor() {
+  constructor(private readonly connect: (profile: StoredCommand) => void) {
     const box = el("div", "manager");
     const listPane = el("div", "mgmt-list");
     const head = el("div", "mgmt-list-head");
@@ -190,7 +190,12 @@ export class CommandManager {
         const avatar = el("div", "host-avatar", initials(c));
         avatar.append(el("span", "h-status unknown"));
         const connect = el("span", "cr-connect", "접속");
-        connect.title = "SSH 접속은 준비 중입니다";
+        connect.title = `${c.sshHost}에 접속`;
+        connect.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.close();
+          this.connect(c);
+        });
         row.append(avatar, main, connect);
       } else {
         row.append(el("span", "type-badge shell", "SH"), main);

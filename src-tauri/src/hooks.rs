@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const FILES: &[(&str, &str)] = &[
+pub const FILES: &[(&str, &str)] = &[
     (".zshenv", include_str!("../../shell/zsh/.zshenv")),
     (".zprofile", include_str!("../../shell/zsh/.zprofile")),
     (".zshrc", include_str!("../../shell/zsh/.zshrc")),
@@ -26,4 +26,17 @@ pub fn install(store_root: &Path) -> std::io::Result<PathBuf> {
         }
     }
     Ok(dir)
+}
+
+/// Identifies this build's hook files, so an older copy on a remote host can be
+/// detected (FNV-1a over names and contents; stable across Rust versions).
+pub fn version() -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for (name, contents) in FILES {
+        for byte in name.bytes().chain([0]).chain(contents.bytes()).chain([0]) {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    format!("{hash:016x}")
 }

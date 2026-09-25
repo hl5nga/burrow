@@ -2,14 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { TerminalSession } from "../terminal/session";
 import { fuzzyScore } from "./fuzzy";
 
-interface StoredCommand {
-  id: string;
-  name: string;
-  command: string;
-  description: string;
-  type: "shell" | "ssh-profile";
-  sshHost: string | null;
-}
+import type { StoredCommand } from "./command-validation";
 
 interface Ranked {
   command: string;
@@ -19,6 +12,8 @@ interface Ranked {
 interface Entry {
   /** Set for registered commands, which ⌘E opens in the manager. */
   commandId?: string;
+  /** Set for SSH profiles: Enter connects instead of typing a command. */
+  profile?: StoredCommand;
   section: string;
   title: string;
   subtitle: string;
@@ -61,6 +56,7 @@ export class CommandPalette {
   constructor(
     private readonly getSession: () => TerminalSession | undefined,
     private readonly editCommand: (id: string) => void,
+    private readonly connect: (profile: StoredCommand) => void,
   ) {
     const box = el("div", "palette");
     const search = el("div", "palette-search");
@@ -139,7 +135,7 @@ export class CommandPalette {
       run: c.command,
       icon: c.type === "ssh-profile" ? "SSH" : "SH",
       titleIsCommand: !c.name,
-      disabledReason: c.type === "ssh-profile" ? "SSH 프로필 접속은 준비 중입니다" : undefined,
+      profile: c.type === "ssh-profile" ? c : undefined,
       searchable: [c.name, c.command, c.description, c.sshHost ?? ""],
     }));
 
@@ -285,6 +281,7 @@ export class CommandPalette {
     if (!entry || entry.disabledReason) return;
     const session = this.getSession();
     this.close();
-    session?.run(entry.run);
+    if (entry.profile) this.connect(entry.profile);
+    else session?.run(entry.run);
   }
 }

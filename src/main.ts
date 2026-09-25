@@ -8,6 +8,8 @@ import { CommandPalette } from "./ui/palette";
 import { FrequentPanel } from "./ui/frequent-panel";
 import { CommandManager } from "./ui/command-manager";
 import { TabManager } from "./ui/tabs";
+import { connectProfile } from "./ui/connect";
+import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
 import "./styles/command-manager.css";
@@ -64,9 +66,12 @@ const activeSession = () => tabs.activeSession();
 // Dev builds: lets scripts/devctl read terminal state (e.g. `devctl screen`).
 if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
 
-const manager = new CommandManager();
-const palette = new CommandPalette(activeSession, (id) =>
-  manager.open(id, () => activeSession()?.focus()),
+const connect = (profile: StoredCommand) => void connectProfile(tabs, profile);
+const manager = new CommandManager(connect);
+const palette = new CommandPalette(
+  activeSession,
+  (id) => manager.open(id, () => activeSession()?.focus()),
+  connect,
 );
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
 

@@ -1,6 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   openTerminalSession,
   type SessionContext,
+  type SessionOptions,
   type TerminalSession,
 } from "../terminal/session";
 import type { HookEvent } from "../terminal/hook-events";
@@ -13,6 +15,8 @@ interface Tab {
   element: HTMLElement;
   session?: TerminalSession;
   context: SessionContext;
+  /** A profile name for SSH tabs, shown instead of the raw hostname. */
+  title?: string;
 }
 
 export interface TabEvents {
@@ -49,7 +53,19 @@ export class TabManager {
     return this.active?.session;
   }
 
-  async newTab() {
+  /** Opens an SSH session for a stored profile in a new tab. */
+  newSshTab(profileId: string, label: string, withHooks: boolean) {
+    return this.newTab({
+      label,
+      options: {
+        remote: true,
+        spawn: (cols, rows, onOutput) =>
+          invoke<number>("pty_spawn_ssh", { profileId, withHooks, cols, rows, onOutput }),
+      },
+    });
+  }
+
+  async newTab(spec: { label?: string; options?: SessionOptions } = {}) {
     const id = this.nextId++;
     const host = document.createElement("div");
     host.className = "term-host";
@@ -59,7 +75,7 @@ export class TabManager {
     element.className = "tab";
     const label = document.createElement("span");
     label.className = "tab-label";
-    label.textContent = "로컬";
+    label.textContent = spec.label ?? "로컬";
     const close = document.createElement("span");
     close.className = "close";
     close.textContent = "×";
@@ -71,7 +87,14 @@ export class TabManager {
     );
     this.bar.insertBefore(element, this.bar.lastElementChild);
 
-    const tab: Tab = { id, host, label, element, context: { host: "local", cwd: "", branch: "" } };
+    const tab: Tab = {
+      id,
+      host,
+      label,
+      element,
+      title: spec.label,
+      context: { host: spec.options?.remote ? "" : "local", cwd: "", branch: "" },
+    };
     this.tabs.push(tab);
     element.addEventListener("mousedown", (e) => {
       if (e.target === close) return;
@@ -82,17 +105,21 @@ export class TabManager {
     this.activate(tab);
 
     try {
-      tab.session = await openTerminalSession(host, {
-        onExit: () => this.close(tab),
-        onContext: (context) => {
-          tab.context = context;
-          this.renderLabel(tab);
-          if (tab === this.active) this.events.onActiveContext(context);
+      tab.session = await openTerminalSession(
+        host,
+        {
+          onExit: () => this.close(tab),
+          onContext: (context) => {
+            tab.context = context;
+            this.renderLabel(tab);
+            if (tab === this.active) this.events.onActiveContext(context);
+          },
+          onHookEvent: (event) => {
+            if (tab === this.active) this.events.onHookEvent(event);
+          },
         },
-        onHookEvent: (event) => {
-          if (tab === this.active) this.events.onHookEvent(event);
-        },
-      });
+        spec.options,
+      );
       if (tab === this.active) tab.session.focus();
     } catch (err) {
       showToast(`터미널을 시작하지 못했습니다: ${err}`);
@@ -138,7 +165,7 @@ export class TabManager {
   }
 
   private renderLabel(tab: Tab) {
-    const where = tab.context.host === "local" ? "로컬" : tab.context.host;
+    const where = tab.title ?? (tab.context.host === "local" ? "로컬" : tab.context.host);
     tab.label.textContent = tab.context.cwd ? `${where} — ${basename(tab.context.cwd)}` : where;
     tab.element.title = tab.context.cwd;
   }

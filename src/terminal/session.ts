@@ -78,9 +78,17 @@ export interface SessionHandlers {
   onHookEvent?(event: HookEvent): void;
 }
 
+export interface SessionOptions {
+  /** Starts the process behind the terminal; defaults to a local login shell. */
+  spawn?(cols: number, rows: number, output: Channel<ArrayBuffer>): Promise<number>;
+  /** An SSH session: every hook event comes from the remote host. */
+  remote?: boolean;
+}
+
 export async function openTerminalSession(
   container: HTMLElement,
   handlers: SessionHandlers,
+  options: SessionOptions = {},
 ): Promise<TerminalSession> {
   const fontFamily = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim();
   await loadTerminalFonts(fontFamily);
@@ -100,7 +108,10 @@ export async function openTerminalSession(
   term.unicode.activeVersion = "11";
   term.open(container);
 
-  const context: SessionContext = { host: "local", cwd: "", branch: "" };
+  const context: SessionContext = { host: options.remote ? "" : "local", cwd: "", branch: "" };
+  // A local tab's first event comes from this machine; later events from another
+  // host mean the user ssh'd somewhere that has Burrow's hooks.
+  let thisMachine: string | undefined;
   let running = false;
   let write: (data: string) => void = () => {};
   const blocks = new BlockTracker(term, {
@@ -116,9 +127,12 @@ export async function openTerminalSession(
     }
     if (!event) return true;
     const branch = event.type === "prompt" ? event.branch : context.branch;
-    if (event.cwd !== context.cwd || branch !== context.branch) {
+    if (!options.remote) thisMachine ??= event.host;
+    const host = options.remote || event.host !== thisMachine ? event.host : "local";
+    if (event.cwd !== context.cwd || branch !== context.branch || host !== context.host) {
       context.cwd = event.cwd;
       context.branch = branch;
+      context.host = host;
       handlers.onContext?.({ ...context });
     }
     if (event.type === "exec") {
@@ -153,11 +167,9 @@ export async function openTerminalSession(
   const output = new Channel<ArrayBuffer>();
   output.onmessage = (chunk) => term.write(new Uint8Array(chunk));
 
-  const id = await invoke<number>("pty_spawn", {
-    cols: term.cols,
-    rows: term.rows,
-    onOutput: output,
-  });
+  const id = await (options.spawn
+    ? options.spawn(term.cols, term.rows, output)
+    : invoke<number>("pty_spawn", { cols: term.cols, rows: term.rows, onOutput: output }));
 
   const unlistenExit = await listen<PtyExit>("pty-exit", (event) => {
     if (event.payload.id === id) handlers.onExit(event.payload.code);

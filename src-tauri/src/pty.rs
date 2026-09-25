@@ -84,14 +84,7 @@ fn build_command() -> CommandBuilder {
     if let Some(home) = std::env::var_os("HOME") {
         cmd.cwd(home);
     }
-    cmd.env("TERM", "xterm-256color");
-    cmd.env("COLORTERM", "truecolor");
-    cmd.env("TERM_PROGRAM", "Burrow");
-    cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
-    // Apps launched from Finder get no LANG, which breaks CJK input in zsh.
-    if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
-        cmd.env("LANG", system_utf8_locale());
-    }
+    base_env(&mut cmd);
     cmd
 }
 
@@ -151,6 +144,29 @@ pub fn pty_spawn(
     rows: u16,
     on_output: Channel<InvokeResponseBody>,
 ) -> Result<u32, String> {
+    spawn(app, &state, build_command(), cols, rows, on_output)
+}
+
+/// Environment every session gets, local shell or ssh client alike.
+pub fn base_env(cmd: &mut CommandBuilder) {
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    cmd.env("TERM_PROGRAM", "Burrow");
+    cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
+    // Apps launched from Finder get no LANG, which breaks CJK input in zsh.
+    if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
+        cmd.env("LANG", system_utf8_locale());
+    }
+}
+
+pub fn spawn(
+    app: AppHandle,
+    state: &PtyState,
+    command: CommandBuilder,
+    cols: u16,
+    rows: u16,
+    on_output: Channel<InvokeResponseBody>,
+) -> Result<u32, String> {
     let pair = native_pty_system()
         .openpty(PtySize {
             rows,
@@ -162,7 +178,7 @@ pub fn pty_spawn(
 
     let mut child = pair
         .slave
-        .spawn_command(build_command())
+        .spawn_command(command)
         .map_err(|e| e.to_string())?;
     // The reader only sees EOF once every handle to the slave side is closed.
     drop(pair.slave);

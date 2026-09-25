@@ -3,6 +3,7 @@ mod devctl;
 mod hooks;
 mod menu;
 mod pty;
+mod remote;
 mod stats;
 mod store;
 
@@ -23,6 +24,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_take_recoveries,
         stats::stats_record,
         stats::stats_top,
+        remote::remote_hook_status,
+        remote::remote_install_hooks,
+        remote::pty_spawn_ssh,
         devctl::dev_log,
     ]
 }
@@ -39,6 +43,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_take_recoveries,
         stats::stats_record,
         stats::stats_top,
+        remote::remote_hook_status,
+        remote::remote_install_hooks,
+        remote::pty_spawn_ssh,
     ]
 }
 
