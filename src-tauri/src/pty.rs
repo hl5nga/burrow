@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -74,9 +74,28 @@ fn build_command() -> CommandBuilder {
     cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
     // Apps launched from Finder get no LANG, which breaks CJK input in zsh.
     if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
-        cmd.env("LANG", "en_US.UTF-8");
+        cmd.env("LANG", system_utf8_locale());
     }
     cmd
+}
+
+// Mirrors Terminal.app: follow the macOS region setting when a UTF-8 variant exists.
+fn system_utf8_locale() -> &'static str {
+    static LOCALE: OnceLock<String> = OnceLock::new();
+    LOCALE.get_or_init(|| {
+        std::process::Command::new("defaults")
+            .args(["read", "-g", "AppleLocale"])
+            .output()
+            .ok()
+            .and_then(|out| String::from_utf8(out.stdout).ok())
+            .and_then(|raw| raw.trim().split('@').next().map(|s| format!("{s}.UTF-8")))
+            .filter(|name| {
+                std::path::Path::new("/usr/share/locale")
+                    .join(name)
+                    .exists()
+            })
+            .unwrap_or_else(|| "en_US.UTF-8".into())
+    })
 }
 
 // Small reads (keystroke echo) go out immediately; a full read buffer means bulk

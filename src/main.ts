@@ -1,4 +1,7 @@
 import "@xterm/xterm/css/xterm.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/700.css";
+import "./styles/fonts.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openTerminalSession } from "./terminal/session";
 

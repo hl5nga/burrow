@@ -1,0 +1,23 @@
+/* Nanum Gothic Coding's Hangul is 1.0em wide; JetBrains Mono cells are 0.6em,
+   so a wide cell is 1.2em. size-adjust fills both cells instead of leaving gaps. */
+@font-face {
+  font-family: "Burrow Hangul";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("../../node_modules/@fontsource/nanum-gothic-coding/files/nanum-gothic-coding-korean-400-normal.woff2")
+    format("woff2");
+  size-adjust: 120%;
+  unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}
+
+@font-face {
+  font-family: "Burrow Hangul";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("../../node_modules/@fontsource/nanum-gothic-coding/files/nanum-gothic-coding-korean-700-normal.woff2")
+    format("woff2");
+  size-adjust: 120%;
+  unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}

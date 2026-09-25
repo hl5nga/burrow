@@ -3,10 +3,23 @@ import { listen } from "@tauri-apps/api/event";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 
 interface PtyExit {
   id: number;
   code: number | null;
+}
+
+const FONT_SIZE = 13.5;
+
+// xterm measures the cell size once at open(), so the primary font must be ready
+// before that. Hangul glyphs come from unicode-range chunks that load lazily.
+async function loadTerminalFonts(fontFamily: string) {
+  await Promise.all([
+    document.fonts.load(`${FONT_SIZE}px ${fontFamily}`, "W"),
+    document.fonts.load(`bold ${FONT_SIZE}px ${fontFamily}`, "W"),
+    document.fonts.load(`${FONT_SIZE}px ${fontFamily}`, "한글"),
+  ]);
 }
 
 const theme = {
@@ -42,9 +55,12 @@ export async function openTerminalSession(
   container: HTMLElement,
   onExit: (code: number | null) => void,
 ): Promise<TerminalSession> {
+  const fontFamily = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim();
+  await loadTerminalFonts(fontFamily);
+
   const term = new Terminal({
-    fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--mono").trim(),
-    fontSize: 13.5,
+    fontFamily,
+    fontSize: FONT_SIZE,
     lineHeight: 1.2,
     cursorBlink: true,
     scrollback: 10000,
@@ -53,7 +69,14 @@ export async function openTerminalSession(
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
+  term.loadAddon(new Unicode11Addon());
+  term.unicode.activeVersion = "11";
   term.open(container);
+
+  // A newly loaded glyph chunk would otherwise keep its fallback-font rendering
+  // cached in the WebGL texture atlas.
+  const onFontsLoaded = () => term.clearTextureAtlas();
+  document.fonts.addEventListener("loadingdone", onFontsLoaded);
 
   try {
     const webgl = new WebglAddon();
@@ -98,6 +121,7 @@ export async function openTerminalSession(
     term,
     dispose() {
       observer.disconnect();
+      document.fonts.removeEventListener("loadingdone", onFontsLoaded);
       dataSub.dispose();
       resizeSub.dispose();
       unlistenExit();
