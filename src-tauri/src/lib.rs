@@ -6,6 +6,7 @@ mod files;
 mod guardrails;
 mod hooks;
 mod menu;
+mod network;
 mod pty;
 mod remote;
 mod resources;
@@ -49,6 +50,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         vpn::vpn_status,
         vpn::vpn_toggle,
         vpn::network_fingerprint,
+        network::network_online,
         vpn::vpn_pre_connect,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
@@ -86,6 +88,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         vpn::vpn_status,
         vpn::vpn_toggle,
         vpn::network_fingerprint,
+        network::network_online,
         vpn::vpn_pre_connect,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,

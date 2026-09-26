@@ -250,3 +250,11 @@
 .vpn-toggle:disabled {
   opacity: 0.6;
 }
+
+.rm-chip.net {
+  color: var(--success);
+}
+
+.rm-chip.net.offline {
+  color: #ff6259;
+}

@@ -157,12 +157,20 @@ mod tests {
 
     #[test]
     fn script_runs_without_tmux_server() {
+        // Must exist and be empty: when TMUX_TMPDIR names a path that can't be
+        // used at all, tmux silently falls back to the default socket instead
+        // of erroring, which would find a real session under it (any is a
+        // false pass here) rather than exercising the "no server" branch.
+        let dir =
+            std::env::temp_dir().join(format!("burrow-no-tmux-server-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
         let out = std::process::Command::new("sh")
             .args(["-c", SCRIPT])
-            .env("TMUX_TMPDIR", "/tmp/burrow-no-such-tmux-dir")
+            .env("TMUX_TMPDIR", &dir)
             .output()
             .unwrap();
         let text = String::from_utf8_lossy(&out.stdout);
         assert_eq!(parse(&text), TmuxPanes::None, "{text}");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

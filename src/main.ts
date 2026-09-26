@@ -18,6 +18,9 @@ import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
 import { Keybindings } from "./ui/keybindings";
 import { FileBrowser } from "./ui/file-browser";
+import { Launcher, resolveAutoOpen } from "./ui/launcher";
+import { NetworkChip } from "./ui/network-chip";
+import "./styles/launcher.css";
 import "./styles/files.css";
 import "highlight.js/styles/github-dark.css";
 import "./styles/agents.css";
@@ -111,6 +114,7 @@ const activeSession = () => tabs.activeSession();
 if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
 
 const vpn = new VpnChip(app.querySelector<HTMLElement>(".res-mini")!);
+new NetworkChip(app.querySelector<HTMLElement>(".res-mini")!);
 const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
 );
@@ -203,9 +207,20 @@ keys.addToggle(
 );
 void keys.load();
 
-void tabs.newTab().then(() => frequent.init());
 void invoke<{ copyOnSelect?: boolean }>("store_get", { kind: "config" }).then((c) => {
   tabs.copyOnSelect = !!c.copyOnSelect;
 });
 void listen("network-changed", () => tabs.networkChanged());
 showStoreRecoveries();
+
+/**
+ * Startup: a configured auto-open target skips the connection list entirely
+ * (T25); otherwise the list is shown and whichever entry the user picks opens.
+ */
+async function start() {
+  const entry = (await resolveAutoOpen()) ?? (await new Launcher(app).open());
+  if (entry.kind === "local") await tabs.newTab();
+  else await connectProfile(tabs, entry.profile, vpn);
+  await frequent.init();
+}
+void start();

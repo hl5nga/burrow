@@ -123,6 +123,9 @@ pub struct ConfigFile {
     pub frequent_panel_open: bool,
     /// Copy a selection as soon as the mouse is released (Linux terminal habit).
     pub copy_on_select: bool,
+    /// "local", or an ssh-profile id: skip the startup connection list and
+    /// open this one directly. None shows the list.
+    pub auto_open_id: Option<String>,
 }
 
 impl Default for ConfigFile {
@@ -132,6 +135,7 @@ impl Default for ConfigFile {
             promotion_threshold: 5,
             frequent_panel_open: true,
             copy_on_select: false,
+            auto_open_id: None,
         }
     }
 }
