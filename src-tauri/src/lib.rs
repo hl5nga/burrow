@@ -15,10 +15,21 @@ mod store;
 mod tmux;
 mod vpn;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tauri::webview::PageLoadEvent;
 use tauri::{Manager, RunEvent};
+
+/// Set once the user confirms closing the window (the last tab, the red
+/// button, ⌘Q, Dock Quit, or the menu's Burrow 종료 — window.close() emits
+/// the same CloseRequested event as those, so one flag covers every path).
+struct ConfirmedExit(AtomicBool);
+
+#[tauri::command]
+fn confirm_exit(confirmed: tauri::State<'_, ConfirmedExit>) {
+    confirmed.0.store(true, Ordering::SeqCst);
+}
 
 #[cfg(debug_assertions)]
 fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
@@ -54,6 +65,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         vpn::vpn_pre_connect,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
+        confirm_exit,
         devctl::dev_log,
     ]
 }
@@ -92,6 +104,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         vpn::vpn_pre_connect,
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
+        confirm_exit,
     ]
 }
 
@@ -102,7 +115,21 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(pty::PtyState::default())
         .manage(events::EventStreams::default())
+        .manage(ConfirmedExit(AtomicBool::new(false)))
         .menu(menu::build)
+        // The user must confirm before the window (and with it, the app —
+        // there's only one window) actually closes; see ConfirmedExit.
+        .on_window_event(|window, event| {
+            use tauri::Emitter;
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let confirmed = window.state::<ConfirmedExit>();
+                if confirmed.0.load(Ordering::SeqCst) {
+                    return;
+                }
+                api.prevent_close();
+                let _ = window.emit("confirm-quit", ());
+            }
+        })
         .on_menu_event(|app, event| {
             use tauri::Emitter;
             let id = event.id().as_ref();

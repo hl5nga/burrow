@@ -24,6 +24,7 @@ import { NetworkChip } from "./ui/network-chip";
 import { TextSizeChip } from "./ui/text-chip";
 import { loadTextSettings } from "./ui/text-settings";
 import { showAbout } from "./ui/about";
+import { confirmCloseWindow } from "./ui/confirm-close";
 import "./styles/launcher.css";
 import "./styles/files.css";
 import "highlight.js/styles/github-dark.css";
@@ -111,6 +112,7 @@ const tabs = new TabManager(
       showConnection(connection);
       resources.activeChanged();
     },
+    confirmCloseLastTab: confirmCloseWindow,
     onLastTabClosed: () => getCurrentWindow().close(),
   },
 );
@@ -287,4 +289,13 @@ async function viewStartup() {
 }
 void listen("menu-view-startup", () => void viewStartup());
 void listen("menu-about", () => void showAbout());
-Object.assign(devBag, { showAbout, viewStartup });
+void listen("confirm-quit", () => void handleConfirmQuit());
+
+/** The Rust side already prevented the actual close; this decides whether it may proceed. */
+async function handleConfirmQuit() {
+  if (!(await confirmCloseWindow())) return;
+  await invoke("confirm_exit").catch(() => {});
+  await getCurrentWindow().close();
+}
+
+Object.assign(devBag, { showAbout, viewStartup, handleConfirmQuit });

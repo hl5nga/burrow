@@ -74,6 +74,12 @@ export interface TabEvents {
   onHookEvent(event: HookEvent): void;
   /** The active tab's SSH/Mosh connection changed; undefined for local tabs. */
   onActiveConnection(connection: Connection | undefined): void;
+  /**
+   * About to close the very last tab, which would end the whole app: asks
+   * before anything is torn down. False (or the user cancelling) leaves the
+   * tab exactly as it was.
+   */
+  confirmCloseLastTab(): Promise<boolean>;
   onLastTabClosed(): void;
 }
 
@@ -404,6 +410,20 @@ export class TabManager {
 
   close(tab = this.active) {
     if (!tab || !this.tabs.includes(tab)) return;
+    if (this.tabs.length === 1) {
+      // Closing this one ends the whole app: ask before touching anything,
+      // so a cancel truly leaves the session running, not just the tab UI.
+      void this.closeLast(tab);
+      return;
+    }
+    this.remove(tab);
+  }
+
+  private async closeLast(tab: Tab) {
+    if (await this.events.confirmCloseLastTab()) this.remove(tab);
+  }
+
+  private remove(tab: Tab) {
     const index = this.tabs.indexOf(tab);
     this.tabs.splice(index, 1);
     window.clearTimeout(tab.connection?.timer);
