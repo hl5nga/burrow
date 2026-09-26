@@ -242,7 +242,12 @@ pub fn store_put(
     kind: String,
     value: Value,
 ) -> Result<(), String> {
-    store.put_json(&kind, value)
+    store.put_json(&kind, value)?;
+    // Open shells pick the new rules up at their next prompt.
+    if kind == "guardrails" {
+        crate::guardrails::write_local(&store).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

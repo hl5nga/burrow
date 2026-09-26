@@ -168,7 +168,7 @@ export class AgentMonitor implements TabObserver {
         // Another command after the agent ended: the tab is no longer an agent.
         this.removeTab(tab);
       }
-    } else {
+    } else if (event.type === "prompt") {
       const agent = this.agents.get(tab.id);
       if (agent && !agent.exited) {
         agent.exited = true;

@@ -64,6 +64,8 @@ export interface TerminalSession {
   restart(): Promise<void>;
   /** The bottom `lines` rows of the live screen as plain text (no colors). */
   screenText(lines: number): string;
+  /** Writes raw input to the process, as if typed. */
+  send(data: string): void;
   /** Prints a dim status line into the terminal (not sent to the process). */
   notice(text: string): void;
   focus(): void;
@@ -136,6 +138,10 @@ export async function openTerminalSession(
       });
     }
     if (!event) return true;
+    if (event.type === "guardrail") {
+      handlers.onHookEvent?.(event);
+      return true;
+    }
     const branch = event.type === "prompt" ? event.branch : context.branch;
     if (!options.remote) thisMachine ??= event.host;
     const host = options.remote || event.host !== thisMachine ? event.host : "local";
@@ -247,6 +253,7 @@ export async function openTerminalSession(
       while (rows.length && !rows[rows.length - 1].trim()) rows.pop();
       return rows.slice(-lines).join("\n");
     },
+    send: (data) => write(data),
     notice(text) {
       // Start on a fresh line; the remote side may have left the cursor anywhere.
       term.write(`\x1b[0m\r\n\x1b[2m${text}\x1b[0m\r\n`);

@@ -134,6 +134,12 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
   if (profile.tmuxSession && status.state !== "unreachable" && !probe.tmux) {
     showToast(`${label}에 tmux가 없어 일반 셸로 접속합니다`);
   }
+  if (withHooks) {
+    // The host's copy of the guardrail rules follows this Mac's.
+    await invoke("remote_sync_guardrails", { profileId: profile.id }).catch((err) =>
+      showToast(`원격 가드레일 규칙을 맞추지 못했습니다: ${err}`),
+    );
+  }
   const transport = chooseTransport(profile, probe, label);
   await tabs.newSshTab(profile.id, label, withHooks, transport);
 }

@@ -43,3 +43,13 @@ test("malformed or unknown events are rejected", () => {
   assert.equal(parseHookEvent(`exec;${zshPayload("only", "two")}`), undefined);
   assert.equal(parseHookEvent(`other;${zshPayload("a", "b", "c")}`), undefined);
 });
+
+test("guardrail events carry severity, command and rule label", () => {
+  assert.deepEqual(parseHookEvent(`guardrail;${zshPayload("block", "rm -rf ~", "홈 삭제")}`), {
+    type: "guardrail",
+    severity: "block",
+    cmd: "rm -rf ~",
+    label: "홈 삭제",
+  });
+  assert.equal(parseHookEvent(`guardrail;${zshPayload("maybe", "x", "y")}`), undefined);
+});

@@ -144,3 +144,71 @@ test("outside tmux, events are plain OSC", () => {
     assert.ok(!out.includes("\x1bPtmux;"));
   });
 });
+
+// Some sandboxes let zpty start a shell but never hand it the terminal, so the
+// shell never reaches its prompt. Detect that once and skip instead of failing.
+const ZPTY_WORKS = (() => {
+  try {
+    const out = execFileSync(
+      "zsh",
+      [
+        "-f",
+        "-c",
+        "zmodload zsh/zpty; zpty p zsh -f -i; sleep 0.5; zpty -w p 'print -r -- zpty-ok'; sleep 0.5; o=; while zpty -r -t p c; do o+=$c; done; zpty -d p; print -r -- $o",
+      ],
+      { encoding: "utf8", env: { PATH: process.env.PATH! }, timeout: 10_000 },
+    );
+    return out.split("zpty-ok").length > 2; // echoed input plus the output
+  } catch {
+    return false;
+  }
+})();
+const ptyTest = ZPTY_WORKS ? test : test.skip;
+
+// Types into a real interactive zsh (in a pty, so ZLE runs) and returns once
+// the script is done. Each entry of `lines` is sent followed by Enter.
+function typeIntoZsh(home: string, rules: string, lines: string[]) {
+  const rulesFile = join(home, "guardrails.zsh");
+  writeFileSync(rulesFile, rules);
+  const sends = lines.map((l) => `zpty -w z ${JSON.stringify(l)}; sleep 0.4`).join("\n");
+  const driver = `
+zmodload zsh/zpty
+zpty z env ZDOTDIR=${WRAPPERS} HOME=${home} BURROW_GUARDRAILS=${rulesFile} TERM=xterm zsh -il
+sleep 1
+${sends}
+zpty -d z`;
+  execFileSync("zsh", ["-f", "-c", driver], { encoding: "utf8", env: { PATH: process.env.PATH! } });
+}
+
+const RULES = `# burrow-guardrails test
+__burrow_guard_patterns=('touch .*/blocked' 'touch .*/warned')
+__burrow_guard_severity=(block warn)
+__burrow_guard_labels=('test block' 'test warn')
+`;
+
+ptyTest("block rules need a second Enter; warn rules run at once", () => {
+  withHome({ ".zshrc": "" }, (home) => {
+    typeIntoZsh(home, RULES, [`touch ${home}/blocked`]);
+    assert.equal(existsSync(join(home, "blocked")), false, "one Enter must not run it");
+    typeIntoZsh(home, RULES, [`touch ${home}/blocked`, ""]);
+    assert.equal(existsSync(join(home, "blocked")), true, "the second Enter confirms");
+    typeIntoZsh(home, RULES, [`touch ${home}/warned`]);
+    assert.equal(existsSync(join(home, "warned")), true);
+  });
+});
+
+ptyTest("an edited line is checked again, and plugins wrapping accept-line keep working", () => {
+  withHome(
+    {
+      // Like zsh-autosuggestions / syntax-highlighting: the user's own widget.
+      ".zshrc": `my-accept() { print -rn -- x >> $HOME/chain; zle .accept-line }\nzle -N accept-line my-accept`,
+    },
+    (home) => {
+      // Blocked, then the line changes (Ctrl-U, retype): must block again.
+      typeIntoZsh(home, RULES, [`touch ${home}/blocked`, `\x15touch ${home}/blocked`]);
+      assert.equal(existsSync(join(home, "blocked")), false);
+      typeIntoZsh(home, RULES, ["true"]);
+      assert.ok(readFileSync(join(home, "chain"), "utf8").length >= 1, "user widget still runs");
+    },
+  );
+});

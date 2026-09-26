@@ -360,3 +360,61 @@
   gap: 10px;
   margin-top: 18px;
 }
+
+.mgmt-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.type-badge.block {
+  color: #ff6259;
+  background: rgba(255, 98, 89, 0.08);
+  border: 1px solid rgba(255, 98, 89, 0.3);
+}
+
+.type-badge.warn {
+  color: var(--amber);
+  background: rgba(255, 176, 0, 0.08);
+  border: 1px solid rgba(255, 176, 0, 0.2);
+}
+
+.guard-row.hit {
+  border-color: rgba(255, 98, 89, 0.45);
+  background: rgba(255, 98, 89, 0.06);
+}
+
+.guard-row.off {
+  opacity: 0.5;
+}
+
+.cr-tag.bad {
+  color: #ff6259;
+  border-color: rgba(255, 98, 89, 0.4);
+}
+
+.guard-claude {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.gc-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-hi);
+}
+
+.check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-mid);
+}
+
+.btn.danger {
+  color: #ff6259;
+  background: transparent;
+  border: 1px solid rgba(255, 98, 89, 0.35);
+  box-shadow: none;
+}

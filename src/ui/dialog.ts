@@ -1,7 +1,7 @@
 export interface DialogButton<T extends string> {
   value: T;
   label: string;
-  kind?: "primary" | "ghost";
+  kind?: "primary" | "ghost" | "danger";
 }
 
 /** A small modal with a few choices; resolves with the chosen value, or undefined on Escape. */
@@ -9,6 +9,8 @@ export function chooseDialog<T extends string>(
   title: string,
   body: string[],
   buttons: DialogButton<T>[],
+  /** Closes the dialog from outside (resolving undefined), e.g. when it became moot. */
+  signal?: AbortSignal,
 ): Promise<T | undefined> {
   return new Promise((resolve) => {
     const previous = document.activeElement as HTMLElement | null;
@@ -34,7 +36,7 @@ export function chooseDialog<T extends string>(
     };
     for (const b of buttons) {
       const button = document.createElement("button");
-      button.className = b.kind === "ghost" ? "btn ghost" : "btn";
+      button.className = b.kind && b.kind !== "primary" ? `btn ${b.kind}` : "btn";
       button.textContent = b.label;
       button.addEventListener("click", () => finish(b.value));
       row.append(button);
@@ -47,6 +49,7 @@ export function chooseDialog<T extends string>(
         finish(undefined);
       }
     });
+    signal?.addEventListener("abort", () => overlay.isConnected && finish(undefined));
     document.body.append(overlay);
     row.querySelector<HTMLButtonElement>("button")?.focus();
   });

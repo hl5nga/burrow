@@ -13,6 +13,8 @@ import { connectProfile } from "./ui/connect";
 import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
 import { AgentMonitor } from "./ui/agents";
+import { GuardrailPrompt } from "./ui/guardrail-prompt";
+import { GuardrailManager } from "./ui/guardrail-manager";
 import "./styles/agents.css";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
@@ -105,7 +107,11 @@ const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini"
   tabs.resourceTargets(),
 );
 const connect = (profile: StoredCommand) => void connectProfile(tabs, profile, vpn);
-const manager = new CommandManager(connect);
+const guardrails = new GuardrailManager(() => tabs.activeTarget());
+const manager = new CommandManager(
+  connect,
+  () => void guardrails.open(() => activeSession()?.focus()),
+);
 const palette = new CommandPalette(
   activeSession,
   (id) => manager.open(id, () => activeSession()?.focus()),
@@ -113,6 +119,7 @@ const palette = new CommandPalette(
 );
 const agents = new AgentMonitor(() => tabs.sshTabs());
 tabs.observe(agents);
+tabs.observe(new GuardrailPrompt());
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
 
 // Matched on physical keys so shortcuts still work with a Korean input source.

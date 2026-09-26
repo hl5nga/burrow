@@ -152,6 +152,18 @@ export class TabManager {
     });
   }
 
+  /** The active tab's host and folder, for per-host actions like hook installs. */
+  activeTarget() {
+    const tab = this.active;
+    if (!tab) return undefined;
+    return {
+      profileId: tab.connection?.profileId,
+      hostLabel: tab.connection ? (tab.title ?? tab.context.host) : "이 Mac",
+      cwd: tab.context.cwd,
+      foreignShell: !tab.connection && tab.context.host !== "local",
+    };
+  }
+
   /** Connected SSH/Mosh tabs, for polling their hosts' tmux panes. */
   sshTabs(): { profileId: string; tab: TabRef }[] {
     return this.tabs.flatMap((tab) =>

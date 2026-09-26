@@ -1,5 +1,6 @@
 #[cfg(debug_assertions)]
 mod devctl;
+mod guardrails;
 mod hooks;
 mod menu;
 mod pty;
@@ -27,6 +28,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_take_recoveries,
         stats::stats_record,
         stats::stats_top,
+        guardrails::guardrail_test,
+        guardrails::remote_sync_guardrails,
+        guardrails::claude_hook_install,
         remote::remote_probe,
         remote::remote_reachable,
         resources::resource_sample,
@@ -52,6 +56,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::store_take_recoveries,
         stats::stats_record,
         stats::stats_top,
+        guardrails::guardrail_test,
+        guardrails::remote_sync_guardrails,
+        guardrails::claude_hook_install,
         remote::remote_probe,
         remote::remote_reachable,
         resources::resource_sample,
@@ -75,7 +82,12 @@ pub fn run() {
             let store = Arc::new(store::Store::open(store::default_root())?);
             store.start_stats_flusher();
             match hooks::install(store.root()) {
-                Ok(dir) => pty::set_hook_dir(dir),
+                Ok(dir) => {
+                    pty::set_hook_dir(dir);
+                    if let Err(e) = guardrails::write_local(&store) {
+                        eprintln!("guardrails: cannot write rules: {e}");
+                    }
+                }
                 Err(e) => eprintln!("hooks: cannot install zsh wrappers: {e}"),
             }
             app.manage(store);

@@ -86,7 +86,10 @@ export class CommandManager {
   private deleteArmed = false;
   private onClose: () => void = () => {};
 
-  constructor(private readonly connect: (profile: StoredCommand) => void) {
+  constructor(
+    private readonly connect: (profile: StoredCommand) => void,
+    private readonly openGuardrails: () => void,
+  ) {
     const box = el("div", "manager");
     const listPane = el("div", "mgmt-list");
     const head = el("div", "mgmt-list-head");
@@ -95,7 +98,16 @@ export class CommandManager {
     const add = el("button", "btn", "＋ 새로 등록");
     add.type = "button";
     add.addEventListener("click", () => this.edit(emptyCommand()));
-    head.append(title, add);
+    const guard = el("button", "btn ghost", "가드레일");
+    guard.type = "button";
+    guard.title = "위험 명령어 가드레일 규칙";
+    guard.addEventListener("click", () => {
+      this.overlay.hidden = true;
+      this.openGuardrails();
+    });
+    const actions = el("div", "mgmt-head-actions");
+    actions.append(guard, add);
+    head.append(title, actions);
     listPane.append(head, this.list);
 
     box.append(listPane, this.form);
