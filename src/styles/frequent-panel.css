@@ -221,3 +221,11 @@
   color: var(--text-dim);
   writing-mode: vertical-rl;
 }
+
+.scope-hint {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+}

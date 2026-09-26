@@ -69,7 +69,8 @@ export class FrequentPanel {
       this.tabs.set(scope, tab);
       tabRow.append(tab);
     }
-    head.append(titleRow, tabRow);
+    const hint = el("div", "scope-hint", "← → 탭 전환 · 1–9 실행");
+    head.append(titleRow, tabRow, hint);
     this.element.append(head, this.list, this.foot);
     this.element.tabIndex = -1;
     this.element.addEventListener("keydown", (e) => this.onKey(e));
@@ -187,10 +188,20 @@ export class FrequentPanel {
     if (/^[1-9]$/.test(e.key)) {
       e.preventDefault();
       this.run(Number(e.key) - 1);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      this.cycleScope(e.key === "ArrowRight" ? 1 : -1);
     } else if (e.key === "Escape") {
       e.preventDefault();
       this.getSession()?.focus();
     }
+  }
+
+  /** ← →: cycles 여기서 → 이 호스트 → 전체 and back. */
+  private cycleScope(step: 1 | -1) {
+    const order: Scope[] = ["dir", "host", "all"];
+    const i = order.indexOf(this.scope);
+    this.setScope(order[(i + step + order.length) % order.length]);
   }
 
   private run(index: number) {
