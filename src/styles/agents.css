@@ -57,6 +57,14 @@
   border-top: 1px solid var(--border);
 }
 
+.agents-host {
+  margin: 10px 4px 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+
 .agent-row {
   all: unset;
   display: flex;

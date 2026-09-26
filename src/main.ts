@@ -111,7 +111,7 @@ const palette = new CommandPalette(
   (id) => manager.open(id, () => activeSession()?.focus()),
   connect,
 );
-const agents = new AgentMonitor();
+const agents = new AgentMonitor(() => tabs.sshTabs());
 tabs.observe(agents);
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
 

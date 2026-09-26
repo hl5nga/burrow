@@ -152,6 +152,15 @@ export class TabManager {
     });
   }
 
+  /** Connected SSH/Mosh tabs, for polling their hosts' tmux panes. */
+  sshTabs(): { profileId: string; tab: TabRef }[] {
+    return this.tabs.flatMap((tab) =>
+      tab.connection?.state === "connected"
+        ? [{ profileId: tab.connection.profileId, tab: this.ref(tab) }]
+        : [],
+    );
+  }
+
   /** Each tab's host for the CPU/RAM monitor, with a hook for its tab dot. */
   resourceTargets(): ResourceTarget[] {
     return this.tabs.map((tab) => ({
