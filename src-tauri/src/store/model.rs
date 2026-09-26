@@ -419,6 +419,9 @@ impl Default for KeybindingsFile {
             bind("search-scrollback", "Cmd+F"),
             bind("open-command-manager", "Cmd+,"),
             bind("split-pane", "Cmd+D"),
+            bind("toggle-agent-dashboard", "Cmd+Shift+A"),
+            bind("copy", "Cmd+C"),
+            bind("open-keybindings", "Cmd+/"),
         ];
         bindings.extend((1..=9).map(|n| bind(&format!("select-tab-{n}"), &format!("Cmd+{n}"))));
         Self {

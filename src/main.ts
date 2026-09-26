@@ -16,6 +16,7 @@ import { ResourceMonitor } from "./ui/resource-chip";
 import { AgentMonitor } from "./ui/agents";
 import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
+import { Keybindings } from "./ui/keybindings";
 import "./styles/agents.css";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
@@ -112,6 +113,8 @@ const guardrails = new GuardrailManager(() => tabs.activeTarget());
 const manager = new CommandManager(
   connect,
   () => void guardrails.open(() => activeSession()?.focus()),
+  // `keys` is created below; this only runs on a click, long after.
+  () => keys.open(() => activeSession()?.focus()),
 );
 const palette = new CommandPalette(
   activeSession,
@@ -123,69 +126,71 @@ tabs.observe(agents);
 tabs.observe(new GuardrailPrompt());
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
 
-// Matched on physical keys so shortcuts still work with a Korean input source.
-window.addEventListener(
-  "keydown",
-  (e) => {
-    if (!e.metaKey || e.ctrlKey || e.altKey) return;
-    const handled = () => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    if (e.shiftKey) {
-      if (e.code === "KeyA") {
-        handled();
-        agents.toggle();
-      } else if (e.code === "BracketRight") {
-        handled();
-        tabs.selectRelative(1);
-      } else if (e.code === "BracketLeft") {
-        handled();
-        tabs.selectRelative(-1);
-      }
-      return;
-    }
-    const digit = /^Digit([1-9])$/.exec(e.code);
-    if (digit) {
-      handled();
-      tabs.select(Number(digit[1]) - 1);
-      return;
-    }
-    switch (e.code) {
-      case "KeyC": {
-        // Only the terminal's own selection; text fields in panels copy natively.
-        const session = activeSession();
-        if (!session || !app.querySelector(".term-body")?.contains(e.target as Node)) return;
-        handled();
-        // No selection: nothing (on macOS, interrupting is Ctrl-C, not ⌘C).
-        void session.copySelection();
-        break;
-      }
-      case "KeyK":
-        handled();
-        palette.toggle();
-        break;
-      case "Comma":
-        handled();
-        if (manager.isOpen) manager.close();
-        else void manager.open(undefined, () => activeSession()?.focus());
-        break;
-      case "KeyJ":
-        handled();
-        frequent.toggle();
-        break;
-      case "KeyT":
-        handled();
-        void tabs.newTab();
-        break;
-      case "KeyW":
-        handled();
-        tabs.close();
-        break;
-    }
+const inTerminal = (e: Event) =>
+  !!app.querySelector(".term-body")?.contains(e.target as Node) &&
+  !(e.target as HTMLElement).closest?.(".res-mini");
+const keys = new Keybindings({
+  altScreen: () => activeSession()?.term.buffer.active.type === "alternate",
+  inTerminal,
+});
+const focusTerminal = () => activeSession()?.focus();
+keys.register({
+  id: "toggle-command-palette",
+  label: "커맨드 팔레트",
+  run: () => palette.toggle(),
+});
+keys.register({
+  id: "toggle-frequent-panel",
+  label: "자주 쓰는 명령어 패널",
+  run: () => frequent.toggle(),
+});
+keys.register({
+  id: "toggle-agent-dashboard",
+  label: "에이전트 대시보드",
+  run: () => agents.toggle(),
+});
+keys.register({
+  id: "open-command-manager",
+  label: "명령어·SSH 프로필 관리",
+  run: () => {
+    if (manager.isOpen) manager.close();
+    else void manager.open(undefined, focusTerminal);
   },
-  true,
+});
+keys.register({
+  id: "open-keybindings",
+  label: "단축키 설정",
+  run: () => (keys.isOpen ? keys.close() : keys.open(focusTerminal)),
+});
+keys.register({ id: "new-tab", label: "새 탭", run: () => void tabs.newTab() });
+keys.register({ id: "close-tab", label: "탭 닫기", run: () => tabs.close() });
+keys.register({ id: "next-tab", label: "다음 탭", run: () => tabs.selectRelative(1) });
+keys.register({ id: "previous-tab", label: "이전 탭", run: () => tabs.selectRelative(-1) });
+for (let n = 1; n <= 9; n++) {
+  keys.register({ id: `select-tab-${n}`, label: `${n}번째 탭`, run: () => tabs.select(n - 1) });
+}
+keys.register({
+  id: "copy",
+  label: "선택 영역 복사",
+  // Text fields in panels keep their native copy; in the terminal, no
+  // selection means nothing happens (interrupting is Ctrl-C on macOS).
+  run: (e) => {
+    const session = activeSession();
+    if (!session || !inTerminal(e)) return false;
+    void session.copySelection();
+  },
+});
+keys.addToggle(
+  "마우스로 선택하면 바로 복사",
+  () => tabs.copyOnSelect,
+  (on) => {
+    tabs.copyOnSelect = on;
+    void invoke<Record<string, unknown>>("store_get", { kind: "config" }).then((config) =>
+      invoke("store_put", { kind: "config", value: { ...config, copyOnSelect: on } }),
+    );
+  },
 );
+void keys.load();
 
 void tabs.newTab().then(() => frequent.init());
 void invoke<{ copyOnSelect?: boolean }>("store_get", { kind: "config" }).then((c) => {

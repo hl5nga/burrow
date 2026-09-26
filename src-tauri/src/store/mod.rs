@@ -250,6 +250,12 @@ pub fn store_put(
     Ok(())
 }
 
+/// Every action's built-in binding; files from older builds lack newer actions.
+#[tauri::command]
+pub fn keybinding_defaults() -> Vec<Keybinding> {
+    KeybindingsFile::default().bindings
+}
+
 #[tauri::command]
 pub fn store_take_recoveries(store: tauri::State<'_, Arc<Store>>) -> Vec<Recovery> {
     store.take_recoveries()

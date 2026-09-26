@@ -89,6 +89,7 @@ export class CommandManager {
   constructor(
     private readonly connect: (profile: StoredCommand) => void,
     private readonly openGuardrails: () => void,
+    private readonly openKeybindings: () => void,
   ) {
     const box = el("div", "manager");
     const listPane = el("div", "mgmt-list");
@@ -105,8 +106,14 @@ export class CommandManager {
       this.overlay.hidden = true;
       this.openGuardrails();
     });
+    const keysButton = el("button", "btn ghost", "단축키");
+    keysButton.type = "button";
+    keysButton.addEventListener("click", () => {
+      this.overlay.hidden = true;
+      this.openKeybindings();
+    });
     const actions = el("div", "mgmt-head-actions");
-    actions.append(guard, add);
+    actions.append(keysButton, guard, add);
     head.append(title, actions);
     listPane.append(head, this.list);
 

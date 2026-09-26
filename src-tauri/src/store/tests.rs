@@ -47,7 +47,11 @@ fn missing_files_are_created_with_defaults_and_presets() {
         GuardrailsFile::default().rules
     );
     assert_eq!(store.load::<SecretsPatternsFile>().patterns.len(), 5);
-    assert_eq!(store.load::<KeybindingsFile>().bindings.len(), 18);
+    assert_eq!(
+        store.load::<KeybindingsFile>().bindings,
+        KeybindingsFile::default().bindings
+    );
+    assert!(KeybindingsFile::default().bindings.len() >= 18);
     assert!(store.load::<CommandsFile>().commands.is_empty());
     assert!(store.stats().hosts.contains_key("local"));
 
