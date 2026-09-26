@@ -80,3 +80,24 @@ test("a broken user pattern is skipped, not fatal", () => {
   });
   assert.equal(custom.classify("mine", "Proceed?"), "waiting");
 });
+
+// Mid-2026 Claude Code after a turn: a "done" summary and the mode footer,
+// no "? for shortcuts" (as seen inside tmux over ssh).
+const claudeIdle2026 = `
+✻ Cogitated for 7m 10s · done 12:05 AM
+                                   new task? /clear to save 532.4k tokens
+────────────────────────────────────────
+❯ next instruction being typed
+────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents
+[work] 1:cpo* 2:be  3:fe`;
+
+test("the 2026 Claude Code idle screen reads as done, and still works while busy", () => {
+  assert.equal(agents.detect(claudeIdle2026), "claude-code");
+  assert.equal(agents.classify("claude-code", claudeIdle2026), "done");
+  const busy = claudeIdle2026.replace(
+    "✻ Cogitated for 7m 10s · done 12:05 AM",
+    "✻ Cogitating… (42s · ↓ 3.1k tokens · esc to interrupt)",
+  );
+  assert.equal(agents.classify("claude-code", busy), "working");
+});
