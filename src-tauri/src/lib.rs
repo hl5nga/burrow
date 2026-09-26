@@ -4,6 +4,7 @@ mod hooks;
 mod menu;
 mod pty;
 mod remote;
+mod resources;
 mod stats;
 mod store;
 mod vpn;
@@ -27,6 +28,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_top,
         remote::remote_probe,
         remote::remote_reachable,
+        resources::resource_sample,
         vpn::vpn_status,
         vpn::vpn_pre_connect,
         remote::remote_install_hooks,
@@ -49,6 +51,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_top,
         remote::remote_probe,
         remote::remote_reachable,
+        resources::resource_sample,
         vpn::vpn_status,
         vpn::vpn_pre_connect,
         remote::remote_install_hooks,

@@ -8,6 +8,7 @@ import {
 import type { HookEvent } from "../terminal/hook-events";
 import { showToast } from "./toast";
 import { checkReachable } from "./reachability";
+import type { Level, ResourceTarget } from "./resource-chip";
 
 export type SessionTransport = "ssh" | "mosh";
 
@@ -101,6 +102,30 @@ export class TabManager {
           }),
       },
     });
+  }
+
+  /** Each tab's host for the CPU/RAM monitor, with a hook for its tab dot. */
+  resourceTargets(): ResourceTarget[] {
+    return this.tabs.map((tab) => ({
+      profileId: tab.connection?.profileId,
+      label: tab.title ?? "이 Mac",
+      active: tab === this.active,
+      reachable: !tab.connection || tab.connection.state === "connected",
+      setLevel: (value: Level | undefined) => {
+        let dot = tab.element.querySelector<HTMLElement>(".res-dot");
+        if (!value) return dot?.remove();
+        if (!dot) {
+          dot = document.createElement("span");
+          tab.element.insertBefore(dot, tab.element.querySelector(".close"));
+        }
+        dot.className = `res-dot ${value}`;
+        dot.title = {
+          ok: "CPU·메모리 여유",
+          warn: "CPU·메모리 60% 이상",
+          high: "CPU·메모리 85% 이상",
+        }[value];
+      },
+    }));
   }
 
   /** Mosh roams on its own; SSH tabs that are waiting to reconnect retry now. */

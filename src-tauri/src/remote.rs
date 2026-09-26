@@ -112,7 +112,7 @@ fn common_args(store: &Store) -> Result<Vec<String>, String> {
     Ok(args)
 }
 
-struct Profile {
+pub(crate) struct Profile {
     /// `[user@]host`, what ssh takes as its destination.
     dest: String,
     port: Option<String>,
@@ -150,7 +150,7 @@ pub fn validate_tmux_session(name: &str) -> Result<(), String> {
     }
 }
 
-fn load_profile(store: &Store, profile_id: &str) -> Result<Profile, String> {
+pub(crate) fn load_profile(store: &Store, profile_id: &str) -> Result<Profile, String> {
     let commands = store.load::<CommandsFile>();
     let profile = commands
         .commands
@@ -181,7 +181,7 @@ fn load_profile(store: &Store, profile_id: &str) -> Result<Profile, String> {
 }
 
 /// Runs `script` on the host with `sh`, without a tty and without ever prompting.
-fn side_command(
+pub(crate) fn side_command(
     store: &Store,
     profile: &Profile,
     script: &str,

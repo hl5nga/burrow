@@ -11,6 +11,7 @@ import { CommandManager } from "./ui/command-manager";
 import { TabManager, type Connection } from "./ui/tabs";
 import { connectProfile } from "./ui/connect";
 import { VpnChip } from "./ui/vpn-chip";
+import { ResourceMonitor } from "./ui/resource-chip";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
@@ -79,13 +80,17 @@ const tabs = new TabManager(
   {
     onActiveContext: (context) => {
       showContext(context);
+      resources.activeChanged();
       void frequent.refresh();
     },
     onHookEvent: (event) => {
       // stats_record went out on "exec"; by the next prompt the counts include it.
       if (event.type === "prompt") void frequent.refresh();
     },
-    onActiveConnection: showConnection,
+    onActiveConnection: (connection) => {
+      showConnection(connection);
+      resources.activeChanged();
+    },
     onLastTabClosed: () => getCurrentWindow().close(),
   },
 );
@@ -94,6 +99,9 @@ const activeSession = () => tabs.activeSession();
 if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
 
 const vpn = new VpnChip(app.querySelector<HTMLElement>(".res-mini")!);
+const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
+  tabs.resourceTargets(),
+);
 const connect = (profile: StoredCommand) => void connectProfile(tabs, profile, vpn);
 const manager = new CommandManager(connect);
 const palette = new CommandPalette(
