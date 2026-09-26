@@ -79,6 +79,11 @@ export interface TerminalSession {
   paste(text: string): void;
   /** Writes raw input to the process, as if typed. */
   send(data: string): void;
+  /**
+   * A hook event that came another way than the terminal stream (the Mosh
+   * side channel). Ignored once real OSC events show up, so nothing counts twice.
+   */
+  hookEvent(data: string): void;
   /** Prints a dim status line into the terminal (not sent to the process). */
   notice(text: string): void;
   focus(): void;
@@ -150,7 +155,9 @@ export async function openTerminalSession(
     rerun: (cmd) => session.run(cmd),
   });
   // Consumed before rendering, so hook events never show up on screen.
-  const hookOsc = term.parser.registerOscHandler(HOOK_OSC, (data) => {
+  /** Set once a real OSC event arrives; side-channel copies are then redundant. */
+  let oscSeen = false;
+  const handleHookData = (data: string) => {
     const event = parseHookEvent(data);
     if (import.meta.env.DEV) {
       invoke("dev_log", {
@@ -181,6 +188,10 @@ export async function openTerminalSession(
     }
     handlers.onHookEvent?.(event);
     return true;
+  };
+  const hookOsc = term.parser.registerOscHandler(HOOK_OSC, (data) => {
+    oscSeen = true;
+    return handleHookData(data);
   });
   const ime = installImeHandler(term, container);
 
@@ -298,6 +309,9 @@ export async function openTerminalSession(
       return rows.slice(-lines).join("\n");
     },
     send: (data) => write(data),
+    hookEvent(data) {
+      if (!oscSeen) handleHookData(data);
+    },
     async copySelection() {
       if (!term.hasSelection()) return false;
       await copyText(scrub(term.getSelection()));

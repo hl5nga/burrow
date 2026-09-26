@@ -198,6 +198,16 @@ pub(crate) fn side_command(
     }
 }
 
+/// A non-interactive ssh to the profile's host (ControlMaster, BatchMode),
+/// for callers that stream the output instead of waiting for it.
+pub(crate) fn side_ssh(store: &Store, profile: &Profile) -> Result<Command, String> {
+    let mut cmd = Command::new("ssh");
+    cmd.args(common_args(store)?)
+        .args(["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8"])
+        .args(profile.target_args());
+    Ok(cmd)
+}
+
 fn run_ssh(
     store: &Store,
     profile: &Profile,
@@ -259,6 +269,9 @@ pub struct RemoteProbe {
     hooks: HookStatus,
     /// `mosh-server` is on the host's login PATH.
     mosh_server: bool,
+    /// Its absolute path: mosh starts it over a non-login ssh command, where
+    /// Homebrew's PATH is missing, so it must be named in full.
+    mosh_server_path: Option<String>,
     tmux: bool,
     /// `mosh` is installed on this Mac.
     local_mosh: bool,
@@ -270,17 +283,20 @@ const PROBE_SCRIPT: &str = concat!(
     "printf 'burrow:version:%s\\n' \"$(cat \"$HOME/.burrow/shell/zsh/VERSION\" 2>/dev/null || echo missing)\"; ",
     "else echo burrow:no-zsh; fi; ",
     // Non-interactive ssh lacks Homebrew's PATH; a login shell has it.
-    "\"${SHELL:-sh}\" -lc 'command -v mosh-server >/dev/null 2>&1 && echo burrow:mosh; ",
+    "\"${SHELL:-sh}\" -lc 'p=$(command -v mosh-server 2>/dev/null) && echo \"burrow:mosh:$p\"; ",
     "command -v tmux >/dev/null 2>&1 && echo burrow:tmux' </dev/null 2>/dev/null; true"
 );
 
-fn parse_probe(out: &str) -> (HookStatus, bool, bool) {
+fn parse_probe(out: &str) -> (HookStatus, Option<String>, bool) {
     let mut hooks = HookStatus::Missing;
-    let (mut mosh, mut tmux) = (false, false);
+    let (mut mosh, mut tmux) = (None, false);
     for line in out.lines().map(str::trim) {
+        if let Some(path) = line.strip_prefix("burrow:mosh:") {
+            mosh = Some(path.to_string()).filter(|p| valid_server_path(p));
+            continue;
+        }
         match line {
             "burrow:no-zsh" => hooks = HookStatus::NoZsh,
-            "burrow:mosh" => mosh = true,
             "burrow:tmux" => tmux = true,
             _ => {
                 if let Some(v) = line.strip_prefix("burrow:version:") {
@@ -307,19 +323,30 @@ pub fn remote_probe(
         Err(reason) => RemoteProbe {
             hooks: HookStatus::Unreachable { reason },
             mosh_server: false,
+            mosh_server_path: None,
             tmux: false,
             local_mosh,
         },
         Ok(out) => {
-            let (hooks, mosh_server, tmux) = parse_probe(&out);
+            let (hooks, mosh_server_path, tmux) = parse_probe(&out);
             RemoteProbe {
                 hooks,
-                mosh_server,
+                mosh_server: mosh_server_path.is_some(),
+                mosh_server_path,
                 tmux,
                 local_mosh,
             }
         }
     })
+}
+
+/// The path goes into mosh's command line and then a remote shell: plain
+/// absolute paths only.
+fn valid_server_path(path: &str) -> bool {
+    path.starts_with('/')
+        && path
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "/._-+".contains(c))
 }
 
 /// Apps started from the Finder get a bare PATH, so look where Homebrew puts it too.
@@ -423,21 +450,54 @@ pub fn remote_install_hooks(
     side_command(&store, &profile, "sh -s", Some(script.as_bytes())).map(|_| ())
 }
 
+/// Where a Mosh tab's hook events go (see `events.rs`), as a remote shell word.
+pub(crate) fn event_log_path(session: &str) -> String {
+    format!("$HOME/.burrow/events/{session}.log")
+}
+
+/// Burrow picks tab session ids; they end up in remote shell commands.
+pub(crate) fn valid_session_id(id: &str) -> bool {
+    (8..=64).contains(&id.len()) && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+}
+
 /// The command the remote side runs, or None for the user's plain login shell.
 /// sshd hands it to the user's shell; mosh-server execs it, hence `sh -c` there.
-fn remote_command(with_hooks: bool, tmux_session: Option<&str>) -> Option<String> {
+/// `event_log` is set for Mosh tabs, which can't carry the hooks' OSC events.
+fn remote_command(
+    with_hooks: bool,
+    tmux_session: Option<&str>,
+    event_log: Option<&str>,
+) -> Option<String> {
     let wrapper = format!("$HOME/{REMOTE_HOOK_DIR}");
+    let log = event_log.map(event_log_path);
+    // Plain shell: an env assignment in front of zsh.
+    let log_env = log
+        .as_deref()
+        .map(|l| format!("BURROW_EVENT_LOG=\"{l}\" "))
+        .unwrap_or_default();
+    // tmux: the new session's environment, and the existing session's for its
+    // new panes (existing panes re-read it through `tmux show-environment`).
+    let (tmux_set, tmux_e) = match &log {
+        Some(l) => (
+            format!(" && tmux set-environment -t \"={{name}}\" BURROW_EVENT_LOG \"{l}\""),
+            format!(" -e BURROW_EVENT_LOG=\"{l}\""),
+        ),
+        None => (String::new(), String::new()),
+    };
     match (tmux_session, with_hooks) {
         (None, false) => None,
-        (None, true) => Some(format!("ZDOTDIR=\"{wrapper}\" exec zsh -l")),
+        (None, true) => Some(format!("{log_env}ZDOTDIR=\"{wrapper}\" exec zsh -l")),
         // A running tmux server keeps its own environment: -e only reaches a new
         // session, set-environment reaches new panes of an existing one.
-        (Some(name), true) => Some(format!(
-            "exec zsh -lc 'W=\"{wrapper}\"; if command -v tmux >/dev/null; then \
-             tmux has-session -t \"={name}\" 2>/dev/null && tmux set-environment -t \"={name}\" ZDOTDIR \"$W\"; \
-             exec tmux new -A -s {name} -e ZDOTDIR=\"$W\"; fi; \
-             echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; ZDOTDIR=\"$W\" exec zsh -l'"
-        )),
+        (Some(name), true) => {
+            let tmux_set = tmux_set.replace("{name}", name);
+            Some(format!(
+                "exec zsh -lc 'W=\"{wrapper}\"; if command -v tmux >/dev/null; then \
+                 tmux has-session -t \"={name}\" 2>/dev/null && tmux set-environment -t \"={name}\" ZDOTDIR \"$W\"{tmux_set}; \
+                 exec tmux new -A -s {name} -e ZDOTDIR=\"$W\"{tmux_e}; fi; \
+                 echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; {log_env}ZDOTDIR=\"$W\" exec zsh -l'"
+            ))
+        }
         (Some(name), false) => Some(format!(
             "exec \"${{SHELL:-sh}}\" -lc 'if command -v tmux >/dev/null; then exec tmux new -A -s {name}; fi; \
              echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; exec \"${{SHELL:-sh}}\" -l'"
@@ -463,8 +523,10 @@ fn session_command(
     profile: &Profile,
     with_hooks: bool,
     transport: SessionTransport,
+    mosh_server: Option<&str>,
+    event_log: Option<&str>,
 ) -> Result<CommandBuilder, String> {
-    let remote = remote_command(with_hooks, profile.tmux_session.as_deref());
+    let remote = remote_command(with_hooks, profile.tmux_session.as_deref(), event_log);
     let mut cmd = match transport {
         SessionTransport::Ssh => {
             let mut cmd = CommandBuilder::new("ssh");
@@ -487,6 +549,12 @@ fn session_command(
             let ssh = ssh.iter().map(|w| shell_quote(w)).collect::<Vec<_>>();
             let mut cmd = CommandBuilder::new(&mosh);
             cmd.arg(format!("--ssh={}", ssh.join(" ")));
+            if let Some(server) = mosh_server {
+                if !valid_server_path(server) {
+                    return Err(format!("사용할 수 없는 mosh-server 경로: {server}"));
+                }
+                cmd.arg(format!("--server={server}"));
+            }
             cmd.arg(&profile.dest);
             if let Some(remote) = remote {
                 cmd.args(["--", "sh", "-c", &remote]);
@@ -523,12 +591,26 @@ pub fn pty_spawn_ssh(
     profile_id: String,
     with_hooks: bool,
     transport: SessionTransport,
+    mosh_server: Option<String>,
+    event_log: Option<String>,
     cols: u16,
     rows: u16,
     on_output: Channel<InvokeResponseBody>,
 ) -> Result<u32, String> {
     let profile = load_profile(&store, &profile_id)?;
-    let command = session_command(&store, &profile, with_hooks, transport)?;
+    if let Some(id) = &event_log {
+        if !valid_session_id(id) {
+            return Err(format!("잘못된 세션 id: {id}"));
+        }
+    }
+    let command = session_command(
+        &store,
+        &profile,
+        with_hooks,
+        transport,
+        mosh_server.as_deref(),
+        event_log.as_deref(),
+    )?;
     pty::spawn(app, &state, command, cols, rows, on_output)
 }
 
@@ -642,11 +724,16 @@ mod tests {
         let out = format!("Welcome!\nburrow:version:{v}\nnvm loaded\nburrow:tmux\n");
         let (hooks, mosh, tmux) = parse_probe(&out);
         assert!(matches!(hooks, HookStatus::Current));
-        assert!(!mosh && tmux);
-        assert!(matches!(
-            parse_probe("burrow:version:missing\nburrow:mosh").0,
-            HookStatus::Missing
-        ));
+        assert!(mosh.is_none() && tmux);
+        let (hooks, mosh, _) =
+            parse_probe("burrow:version:missing\nburrow:mosh:/opt/homebrew/bin/mosh-server");
+        assert!(matches!(hooks, HookStatus::Missing));
+        assert_eq!(mosh.as_deref(), Some("/opt/homebrew/bin/mosh-server"));
+        assert_eq!(
+            parse_probe("burrow:mosh:/x;rm -rf ~").1,
+            None,
+            "unsafe paths are dropped"
+        );
         assert!(matches!(
             parse_probe("burrow:version:0123").0,
             HookStatus::Outdated
@@ -669,15 +756,15 @@ mod tests {
 
     #[test]
     fn remote_commands_per_hook_and_tmux_choice() {
-        assert_eq!(remote_command(false, None), None);
+        assert_eq!(remote_command(false, None, None), None);
         assert_eq!(
-            remote_command(true, None).unwrap(),
+            remote_command(true, None, None).unwrap(),
             "ZDOTDIR=\"$HOME/.burrow/shell/zsh\" exec zsh -l"
         );
-        let hooked = remote_command(true, Some("burrow")).unwrap();
+        let hooked = remote_command(true, Some("burrow"), None).unwrap();
         assert!(hooked.contains("tmux new -A -s burrow -e ZDOTDIR=\"$W\""));
         assert!(hooked.contains("tmux set-environment -t \"=burrow\" ZDOTDIR"));
-        let plain = remote_command(false, Some("burrow")).unwrap();
+        let plain = remote_command(false, Some("burrow"), None).unwrap();
         assert!(plain.contains("exec tmux new -A -s burrow;") && !plain.contains("ZDOTDIR"));
     }
 
@@ -724,5 +811,24 @@ mod tests {
         assert_eq!(profile.target_args(), ["-p", "2222", "--", "me@box"]);
         assert_eq!(profile.tmux_session.as_deref(), Some("work"));
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn mosh_tabs_tell_the_shell_where_to_log_events() {
+        let id = "0123abcd-4567";
+        let plain = remote_command(true, None, Some(id)).unwrap();
+        assert!(plain
+            .starts_with("BURROW_EVENT_LOG=\"$HOME/.burrow/events/0123abcd-4567.log\" ZDOTDIR="));
+        let tmux = remote_command(true, Some("work"), Some(id)).unwrap();
+        assert!(tmux.contains("-e BURROW_EVENT_LOG="));
+        assert!(tmux.contains("tmux set-environment -t \"=work\" BURROW_EVENT_LOG"));
+        // The whole thing must still parse as one shell command.
+        let check = Command::new("sh")
+            .args(["-n", "-c", &tmux])
+            .status()
+            .unwrap();
+        assert!(check.success());
+        assert!(valid_session_id(id));
+        assert!(!valid_session_id("x; rm -rf ~"));
     }
 }

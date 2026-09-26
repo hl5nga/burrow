@@ -1,6 +1,7 @@
 mod clip;
 #[cfg(debug_assertions)]
 mod devctl;
+mod events;
 mod files;
 mod guardrails;
 mod hooks;
@@ -32,6 +33,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_record,
         stats::stats_top,
         clip::clip_image_save,
+        events::remote_event_stream,
+        events::remote_event_stop,
         files::fs_list,
         files::fs_read,
         guardrails::guardrail_test,
@@ -65,6 +68,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_record,
         stats::stats_top,
         clip::clip_image_save,
+        events::remote_event_stream,
+        events::remote_event_stop,
         files::fs_list,
         files::fs_read,
         guardrails::guardrail_test,
@@ -89,6 +94,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .manage(pty::PtyState::default())
+        .manage(events::EventStreams::default())
         .menu(menu::build)
         .setup(|app| {
             let store = Arc::new(store::Store::open(store::default_root())?);
@@ -114,6 +120,7 @@ pub fn run() {
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
                 webview.state::<pty::PtyState>().kill_all();
+                webview.state::<events::EventStreams>().kill_all();
             }
         })
         .build(tauri::generate_context!())
@@ -121,6 +128,7 @@ pub fn run() {
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 app.state::<pty::PtyState>().kill_all();
+                app.state::<events::EventStreams>().kill_all();
                 if let Err(e) = app.state::<Arc<store::Store>>().flush_stats() {
                     eprintln!("store: cannot write stats on exit: {e}");
                 }

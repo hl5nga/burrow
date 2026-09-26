@@ -296,11 +296,8 @@ fn agent_presets_fill_files_written_before_them() {
     let tools = value["tools"].as_object().unwrap();
     assert!(tools.contains_key("claude-code"));
     assert_eq!(tools["claude-code"]["commands"][0], "claude");
-    assert!(
-        tools["claude-code"]["waitingApproval"]
-            .as_array()
-            .unwrap()
-            .len()
-            > 0
-    );
+    assert!(!tools["claude-code"]["waitingApproval"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }

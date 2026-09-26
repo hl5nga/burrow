@@ -13,6 +13,7 @@ type HookStatus =
 interface RemoteProbe {
   hooks: HookStatus;
   moshServer: boolean;
+  moshServerPath: string | null;
   tmux: boolean;
   localMosh: boolean;
 }
@@ -141,5 +142,5 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
     );
   }
   const transport = chooseTransport(profile, probe, label);
-  await tabs.newSshTab(profile.id, label, withHooks, transport);
+  await tabs.newSshTab(profile.id, label, withHooks, transport, probe.moshServerPath);
 }

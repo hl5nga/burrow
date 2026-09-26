@@ -3,6 +3,9 @@
 #   exec   : host, cwd, command line        (preexec — right before a command runs)
 #   prompt : host, cwd, exit status, git branch (precmd — right before the prompt)
 #   guardrail : severity, command line, rule label (a rule matched on Enter)
+# Mosh's terminal emulator drops unknown OSC sequences, so for Mosh tabs Burrow
+# also passes BURROW_EVENT_LOG: each event is appended there as "<event>;<base64>"
+# and Burrow tails the file over its SSH side channel.
 [[ -o interactive ]] || return
 (( ${+__burrow_hooks_loaded} )) && return
 typeset -g __burrow_hooks_loaded=1
@@ -26,9 +29,23 @@ __burrow_emit() {
   else
     printf '\e]9999;%s;%s\a' "$event" "$payload"
   fi
+  # Only while Burrow is listening: it creates the file and deletes it after.
+  [[ -n $BURROW_EVENT_LOG && -f $BURROW_EVENT_LOG ]] && print -r -- "$event;$payload" >> $BURROW_EVENT_LOG
+  return 0
+}
+
+# A tmux pane started before the current Mosh tab attached has an old (or no)
+# BURROW_EVENT_LOG; Burrow keeps the session's value current, so re-read it.
+# Only for users who have used Mosh with Burrow at all (the directory exists).
+__burrow_event_log_refresh() {
+  [[ -n $TMUX && -d $HOME/.burrow/events ]] || return
+  local v
+  v=$(command tmux show-environment BURROW_EVENT_LOG 2>/dev/null) || return
+  [[ $v == BURROW_EVENT_LOG=* ]] && export BURROW_EVENT_LOG=${v#*=}
 }
 
 __burrow_preexec() {
+  __burrow_event_log_refresh
   __burrow_emit exec "$HOST" "$PWD" "$1"
 }
 
@@ -61,6 +78,7 @@ __burrow_git_branch() {
 
 __burrow_precmd() {
   local exit_status=$?
+  __burrow_event_log_refresh
   __burrow_emit prompt "$HOST" "$PWD" "$exit_status" "$(__burrow_git_branch)"
   (( $+functions[__burrow_guard_load] )) && __burrow_guard_load
 }

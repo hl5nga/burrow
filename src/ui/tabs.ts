@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import {
   openTerminalSession,
   type SessionContext,
@@ -47,6 +47,8 @@ interface Tab {
   /** A profile name for SSH tabs, shown instead of the raw hostname. */
   title?: string;
   connection?: ConnectionControl;
+  /** The side-channel event stream of a Mosh tab. */
+  eventStream?: Promise<number | undefined>;
 }
 
 /** What tab-level observers (the agent monitor) get to see of a tab. */
@@ -136,10 +138,19 @@ export class TabManager {
   }
 
   /** Opens an SSH or Mosh session for a stored profile in a new tab. */
-  newSshTab(profileId: string, label: string, withHooks: boolean, transport: SessionTransport) {
+  newSshTab(
+    profileId: string,
+    label: string,
+    withHooks: boolean,
+    transport: SessionTransport,
+    moshServer: string | null = null,
+  ) {
+    // Mosh drops the hooks' OSC events; they come over a side channel instead.
+    const eventLog = transport === "mosh" && withHooks ? crypto.randomUUID() : null;
     return this.newTab({
       label,
       connection: { profileId, transport },
+      eventLog,
       options: {
         remote: true,
         spawn: (cols, rows, onOutput) =>
@@ -147,12 +158,55 @@ export class TabManager {
             profileId,
             withHooks,
             transport,
+            moshServer,
+            eventLog,
             cols,
             rows,
             onOutput,
           }),
       },
     });
+  }
+
+  private async startEvents(
+    tab: Tab,
+    profileId: string,
+    session: string,
+    attempt = 0,
+  ): Promise<number | undefined> {
+    const channel = new Channel<string>();
+    channel.onmessage = (line) => {
+      if (line !== "burrow:stream-ended") return tab.session?.hookEvent(line);
+      // The side channel's ssh died (network change) while Mosh kept going:
+      // reconnect it once the host answers again, backing off up to 30 s.
+      if (!this.tabs.includes(tab)) return;
+      const delay = Math.min(2 ** attempt, 30) * 1000;
+      window.setTimeout(async () => {
+        if (!this.tabs.includes(tab)) return;
+        const reach = await checkReachable(profileId, true);
+        tab.eventStream =
+          reach.state === "offline"
+            ? Promise.resolve(undefined).then(() => {
+                channel.onmessage?.("burrow:stream-ended");
+                return undefined;
+              })
+            : this.startEvents(tab, profileId, session, attempt + 1);
+      }, delay);
+    };
+    try {
+      const id = await invoke<number>("remote_event_stream", {
+        profileId,
+        session,
+        onEvent: channel,
+      });
+      // Healthy for a while: the next drop starts the backoff over.
+      window.setTimeout(() => (attempt = 0), 30_000);
+      return id;
+    } catch (err) {
+      if (attempt === 0) showToast(`Mosh 탭의 명령 추적을 시작하지 못했습니다: ${err}`);
+      channel.onmessage?.("burrow:stream-ended");
+      return undefined;
+    }
   }
 
   /**
@@ -248,6 +302,8 @@ export class TabManager {
       label?: string;
       options?: SessionOptions;
       connection?: Pick<Connection, "profileId" | "transport">;
+      /** Session id of a Mosh tab's event log on the host. */
+      eventLog?: string | null;
     } = {},
   ) {
     const id = this.nextId++;
@@ -328,6 +384,9 @@ export class TabManager {
         spec.options,
       );
       if (tab === this.active) tab.session.focus();
+      if (spec.eventLog && spec.connection) {
+        tab.eventStream = this.startEvents(tab, spec.connection.profileId, spec.eventLog);
+      }
       host.addEventListener("mouseup", () => {
         if (this.copyOnSelect) void tab.session?.copySelection();
       });
@@ -343,6 +402,7 @@ export class TabManager {
     const index = this.tabs.indexOf(tab);
     this.tabs.splice(index, 1);
     window.clearTimeout(tab.connection?.timer);
+    void tab.eventStream?.then((id) => id && invoke("remote_event_stop", { id }).catch(() => {}));
     for (const o of this.observers) o.onClosed(this.ref(tab));
     this.refs.delete(tab);
     tab.session?.dispose();

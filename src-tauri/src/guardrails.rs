@@ -434,7 +434,7 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("재귀 삭제"));
-        assert_eq!(call("git push --force origin main").contains("deny"), true);
+        assert!(call("git push --force origin main").contains("deny"));
         // Escaped quotes inside the command don't hide it.
         assert!(call(r#"echo "x" && git push -f"#).contains("deny"));
         assert_eq!(call("ls -la"), "");
