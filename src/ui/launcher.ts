@@ -4,6 +4,13 @@ import { checkReachable } from "./reachability";
 
 export type LauncherEntry = { kind: "local" } | { kind: "ssh"; profile: StoredCommand };
 
+/**
+ * Opens the SSH-profile registration form (the same one ⌘, opens) and
+ * resolves once the user connects something from it, or undefined if they
+ * close it without connecting — the launcher stays open in that case.
+ */
+export type NewConnectionHandler = () => Promise<LauncherEntry | undefined>;
+
 /** The id `config.json`'s `autoOpenId` uses for the local-terminal entry. */
 const LOCAL_ID = "local";
 
@@ -62,6 +69,20 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 
 const NET_POLL_MS = 5000;
 
+const TERMINAL_ICON = `<svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 6.5L6.5 8.5L4 10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10.5H11.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+
+/** A small type badge to the left of each row: terminal glyph for the local
+ * entry, an "SSH" pill for every remote profile — so the kind of connection
+ * reads at a glance, separately from the reachability dot next to it. */
+function icon(entry: LauncherEntry): HTMLElement {
+  if (entry.kind === "local") {
+    const box = el("span", "launcher-icon local");
+    box.innerHTML = TERMINAL_ICON;
+    return box;
+  }
+  return el("span", "launcher-icon ssh", "SSH");
+}
+
 /**
  * The app's start page: the local terminal plus every registered SSH profile,
  * each with an "auto open" switch (only one may be on — see resolveAutoOpen,
@@ -75,31 +96,59 @@ export class Launcher {
   private online = true;
   private pollTimer = 0;
 
-  constructor(private readonly root: HTMLElement) {
+  private resolveEntry?: (entry: LauncherEntry) => void;
+
+  constructor(
+    private readonly root: HTMLElement,
+    private readonly onNewConnection?: NewConnectionHandler,
+  ) {
     const box = el("div", "launcher");
     const head = el("div", "launcher-head");
+    head.setAttribute("data-tauri-drag-region", "");
     head.append(el("div", "launcher-title", "Burrow"), this.netChip);
-    box.append(head, el("div", "launcher-sub", "연결을 선택하세요"), this.list);
+    const sub = el("div", "launcher-sub", "연결을 선택하세요");
+    sub.setAttribute("data-tauri-drag-region", "");
+    box.append(head, sub, this.list);
     this.overlay.append(box);
+    this.overlay.setAttribute("data-tauri-drag-region", "");
   }
 
   /** Renders the list and resolves once the user picks an entry to open. */
   open(): Promise<LauncherEntry> {
     this.root.append(this.overlay);
     return new Promise<LauncherEntry>((resolve) => {
-      void this.load(resolve);
+      this.resolveEntry = resolve;
+      void this.load();
     }).finally(() => {
       window.clearInterval(this.pollTimer);
       this.overlay.remove();
     });
   }
 
-  private async load(resolve: (entry: LauncherEntry) => void) {
+  private async load() {
     const [profiles, config] = await Promise.all([loadProfiles(), loadConfig()]);
     const autoOpenId = (config.autoOpenId as string | undefined) ?? null;
-    this.render(profiles, autoOpenId, resolve);
+    this.render(profiles, autoOpenId);
     this.pollTimer = window.setInterval(() => void this.pollNetwork(), NET_POLL_MS);
     void this.pollNetwork();
+  }
+
+  /**
+   * The "＋ 새 연결" button: opens the same SSH-profile form ⌘, does, with
+   * this screen hidden underneath. If the user connects something from it,
+   * that finishes startup; if they just close it, the list comes back.
+   */
+  private async handleNewConnection() {
+    if (!this.onNewConnection) return;
+    window.clearInterval(this.pollTimer);
+    this.overlay.hidden = true;
+    const entry = await this.onNewConnection();
+    if (entry) {
+      this.resolveEntry?.(entry);
+      return;
+    }
+    this.overlay.hidden = false;
+    await this.load();
   }
 
   private async pollNetwork() {
@@ -119,32 +168,26 @@ export class Launcher {
     }
   }
 
-  private render(
-    profiles: StoredCommand[],
-    autoOpenId: string | null,
-    resolve: (entry: LauncherEntry) => void,
-  ) {
+  private render(profiles: StoredCommand[], autoOpenId: string | null) {
     const entries: LauncherEntry[] = [
       { kind: "local" },
       ...profiles.map((profile) => ({ kind: "ssh" as const, profile })),
     ];
-    this.list.replaceChildren(...entries.map((entry) => this.row(entry, autoOpenId, resolve)));
+    this.list.replaceChildren(...entries.map((entry) => this.row(entry, autoOpenId)));
     if (profiles.length === 0) {
       this.list.append(
-        el(
-          "div",
-          "launcher-hint",
-          "등록된 SSH 프로필이 없습니다. 로컬 터미널을 열고 ⌘,로 프로필을 등록하세요.",
-        ),
+        el("div", "launcher-hint", "등록된 SSH 프로필이 없습니다. 아래에서 새 연결을 등록하세요."),
       );
+    }
+    if (this.onNewConnection) {
+      const add = el("button", "launcher-new", "＋ 새 연결");
+      add.type = "button";
+      add.addEventListener("click", () => void this.handleNewConnection());
+      this.list.append(add);
     }
   }
 
-  private row(
-    entry: LauncherEntry,
-    autoOpenId: string | null,
-    resolve: (entry: LauncherEntry) => void,
-  ): HTMLButtonElement {
+  private row(entry: LauncherEntry, autoOpenId: string | null): HTMLButtonElement {
     const id = entryId(entry);
     const isSsh = entry.kind === "ssh";
     const row = el("button", isSsh ? "launcher-row ssh" : "launcher-row local");
@@ -162,10 +205,10 @@ export class Launcher {
     main.append(name, sub);
 
     const auto = el("label", "launcher-auto");
-    const checkbox = el("input");
+    const checkbox = el("input", "switch");
     checkbox.type = "checkbox";
     checkbox.checked = autoOpenId === id;
-    auto.append(checkbox, document.createTextNode(" 자동 열기"));
+    auto.append(document.createTextNode("자동 열기"), checkbox);
     auto.title = "다음 실행부터 이 목록을 건너뛰고 바로 엽니다";
     auto.addEventListener("click", (e) => e.stopPropagation());
     checkbox.addEventListener("change", () => void this.setAutoOpen(checkbox.checked ? id : null));
@@ -174,11 +217,11 @@ export class Launcher {
     connect.type = "button";
     connect.addEventListener("click", (e) => {
       e.stopPropagation();
-      resolve(entry);
+      this.resolveEntry?.(entry);
     });
 
-    row.append(dot, main, auto, connect);
-    row.addEventListener("click", () => resolve(entry));
+    row.append(icon(entry), dot, main, auto, connect);
+    row.addEventListener("click", () => this.resolveEntry?.(entry));
 
     if (isSsh) {
       void checkReachable(entry.profile.id).then((r) => {

@@ -76,6 +76,14 @@ const FIELDS: FieldSpec[] = [
 
 /** Registering, editing and deleting commands and SSH profiles (⌘,). */
 export class CommandManager {
+  /**
+   * Overrides `connect` for the current `open()` session only (cleared on the
+   * next `open()`). Lets a caller — the startup connection list's "새 연결"
+   * flow — observe that a connection was actually started, without every
+   * other caller of `connect` needing to know about that.
+   */
+  connectOverride?: (profile: StoredCommand) => void;
+
   private readonly overlay = el("div", "manager-overlay");
   private readonly list = el("div", "mgmt-rows");
   private readonly count = el("span", "mgmt-count");
@@ -144,6 +152,7 @@ export class CommandManager {
   /** Opens the manager, editing `target` (an existing id, or a prefilled new entry). */
   async open(target?: string | Partial<StoredCommand>, onClose?: () => void) {
     this.onClose = onClose ?? (() => {});
+    this.connectOverride = undefined;
     await this.load();
     this.overlay.hidden = false;
     if (typeof target === "string" && target.startsWith("new:")) {
@@ -225,8 +234,11 @@ export class CommandManager {
         connect.title = `${c.sshHost}에 접속`;
         connect.addEventListener("click", (e) => {
           e.stopPropagation();
+          // connect() first: callers that check "did a connection start?" from
+          // the onClose callback (the launcher's new-profile flow) need this
+          // to have already happened by the time close() fires onClose.
+          (this.connectOverride ?? this.connect)(c);
           this.close();
-          this.connect(c);
         });
         row.append(avatar, main, connect);
       } else {

@@ -18,7 +18,7 @@ import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
 import { Keybindings } from "./ui/keybindings";
 import { FileBrowser } from "./ui/file-browser";
-import { Launcher, resolveAutoOpen } from "./ui/launcher";
+import { Launcher, resolveAutoOpen, type LauncherEntry } from "./ui/launcher";
 import { NetworkChip } from "./ui/network-chip";
 import "./styles/launcher.css";
 import "./styles/files.css";
@@ -214,11 +214,43 @@ void listen("network-changed", () => tabs.networkChanged());
 showStoreRecoveries();
 
 /**
+ * The connection list's "＋ 새 연결" button: the same SSH-profile form ⌘,
+ * opens (pre-filled as a new profile). Resolves once the user connects
+ * something from it — any profile, not just the one just created — or
+ * undefined if they close the form without connecting.
+ */
+function openNewSshProfile(): Promise<LauncherEntry | undefined> {
+  return new Promise((resolve) => {
+    let profile: StoredCommand | undefined;
+    let attempted: Promise<unknown> | undefined;
+    // Overrides the shared `connect` for just this manager session, so we can
+    // await the actual connection attempt instead of the fire-and-forget
+    // `connect` wrapper every other caller uses.
+    manager.connectOverride = (p) => {
+      profile = p;
+      attempted = connectProfile(tabs, p, vpn);
+    };
+    void manager.open({ type: "ssh-profile" }, () => {
+      void (async () => {
+        try {
+          await attempted;
+        } catch {
+          // connectProfile already reports its own failures via toast.
+        }
+        // Only a tab that actually opened counts as "handled"; a failed
+        // attempt (offline host, cancelled hook install, …) returns to the list.
+        resolve(profile && tabs.activeSession() ? { kind: "ssh", profile } : undefined);
+      })();
+    });
+  });
+}
+
+/**
  * Startup: a configured auto-open target skips the connection list entirely
  * (T25); otherwise the list is shown and whichever entry the user picks opens.
  */
 async function start() {
-  const entry = (await resolveAutoOpen()) ?? (await new Launcher(app).open());
+  const entry = (await resolveAutoOpen()) ?? (await new Launcher(app, openNewSshProfile).open());
   if (entry.kind === "local") await tabs.newTab();
   else await connectProfile(tabs, entry.profile, vpn);
   await frequent.init();
