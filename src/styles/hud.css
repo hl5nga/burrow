@@ -258,3 +258,75 @@
 .rm-chip.net.offline {
   color: #ff6259;
 }
+
+.rm-chip.text-size {
+  font-family: var(--ui);
+  font-style: italic;
+  font-weight: 700;
+}
+
+.text-card {
+  width: 210px;
+}
+
+.text-row {
+  margin-bottom: 12px;
+}
+
+.text-row-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.text-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-step {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-hi);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  cursor: default;
+}
+
+.text-step:disabled {
+  color: var(--text-dim);
+  opacity: 0.4;
+}
+
+.text-preview {
+  flex: 1;
+  overflow: hidden;
+  text-align: center;
+  color: var(--text-hi);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.text-reset {
+  all: unset;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.text-reset:hover {
+  color: var(--amber);
+}
+
+.text-reset[hidden] {
+  display: none;
+}

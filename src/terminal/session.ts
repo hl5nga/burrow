@@ -9,13 +9,16 @@ import { installInputEventLog } from "./devlog";
 import { HOOK_OSC, parseHookEvent, type HookEvent } from "./hook-events";
 import { BlockTracker } from "./blocks";
 import { copyText } from "../ui/clipboard";
+import { current as textSettings, fontSizePx, lineHeightFor } from "../ui/text-settings";
 
 interface PtyExit {
   id: number;
   code: number | null;
 }
 
-const FONT_SIZE = 13.5;
+/** Read once at session creation; live changes go through setTextSize(). */
+const FONT_SIZE = () => fontSizePx(textSettings.fontLevel);
+const LINE_HEIGHT = () => lineHeightFor(textSettings.lineLevel);
 
 /**
  * Where copied text will be cleaned of secrets (T17, on hold). Kept as the one
@@ -27,11 +30,11 @@ function scrub(text: string): string {
 
 // xterm measures the cell size once at open(), so the primary font must be ready
 // before that. Hangul glyphs come from unicode-range chunks that load lazily.
-async function loadTerminalFonts(fontFamily: string) {
+async function loadTerminalFonts(fontFamily: string, fontSize: number) {
   await Promise.all([
-    document.fonts.load(`${FONT_SIZE}px ${fontFamily}`, "W"),
-    document.fonts.load(`bold ${FONT_SIZE}px ${fontFamily}`, "W"),
-    document.fonts.load(`${FONT_SIZE}px ${fontFamily}`, "한글"),
+    document.fonts.load(`${fontSize}px ${fontFamily}`, "W"),
+    document.fonts.load(`bold ${fontSize}px ${fontFamily}`, "W"),
+    document.fonts.load(`${fontSize}px ${fontFamily}`, "한글"),
   ]);
 }
 
@@ -84,6 +87,8 @@ export interface TerminalSession {
    * side channel). Ignored once real OSC events show up, so nothing counts twice.
    */
   hookEvent(data: string): void;
+  /** Applies a new font size (px) and line-height (multiplier) live. */
+  setTextSize(fontSize: number, lineHeight: number): void;
   /** Prints a dim status line into the terminal (not sent to the process). */
   notice(text: string): void;
   focus(): void;
@@ -128,12 +133,13 @@ export async function openTerminalSession(
   options: SessionOptions = {},
 ): Promise<TerminalSession> {
   const fontFamily = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim();
-  await loadTerminalFonts(fontFamily);
+  const fontSize = FONT_SIZE();
+  await loadTerminalFonts(fontFamily, fontSize);
 
   const term = new Terminal({
     fontFamily,
-    fontSize: FONT_SIZE,
-    lineHeight: 1.2,
+    fontSize,
+    lineHeight: LINE_HEIGHT(),
     cursorBlink: true,
     scrollback: 10000,
     allowProposedApi: true,
@@ -309,6 +315,13 @@ export async function openTerminalSession(
       return rows.slice(-lines).join("\n");
     },
     send: (data) => write(data),
+    setTextSize(fontSize, lineHeight) {
+      term.options.fontSize = fontSize;
+      term.options.lineHeight = lineHeight;
+      // A changed cell size leaves the old glyphs cached at the wrong size.
+      term.clearTextureAtlas();
+      fit.fit();
+    },
     hookEvent(data) {
       if (!oscSeen) handleHookData(data);
     },

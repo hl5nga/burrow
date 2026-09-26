@@ -126,6 +126,11 @@ pub struct ConfigFile {
     /// "local", or an ssh-profile id: skip the startup connection list and
     /// open this one directly. None shows the list.
     pub auto_open_id: Option<String>,
+    /// Terminal text size, 1 (smallest) to 5 (largest); 3 is the default.
+    /// The actual px values are a frontend concern (src/ui/text-settings.ts).
+    pub font_level: u8,
+    /// Terminal line spacing, 1 (tight) to 3 (loose); 2 is the default.
+    pub line_level: u8,
 }
 
 impl Default for ConfigFile {
@@ -136,6 +141,8 @@ impl Default for ConfigFile {
             frequent_panel_open: true,
             copy_on_select: false,
             auto_open_id: None,
+            font_level: 3,
+            line_level: 2,
         }
     }
 }

@@ -256,6 +256,11 @@ export class TabManager {
     );
   }
 
+  /** Applies a new font size/line height to every open tab immediately. */
+  applyTextSettings(fontSize: number, lineHeight: number) {
+    for (const tab of this.tabs) tab.session?.setTextSize(fontSize, lineHeight);
+  }
+
   /** Each tab's host for the CPU/RAM monitor, with a hook for its tab dot. */
   resourceTargets(): ResourceTarget[] {
     return this.tabs.map((tab) => ({

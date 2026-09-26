@@ -2,6 +2,7 @@ import "@xterm/xterm/css/xterm.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./styles/fonts.css";
+import appIcon from "./assets/icon.png";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -20,6 +21,8 @@ import { Keybindings } from "./ui/keybindings";
 import { FileBrowser } from "./ui/file-browser";
 import { Launcher, resolveAutoOpen, type LauncherEntry } from "./ui/launcher";
 import { NetworkChip } from "./ui/network-chip";
+import { TextSizeChip } from "./ui/text-chip";
+import { loadTextSettings } from "./ui/text-settings";
 import "./styles/launcher.css";
 import "./styles/files.css";
 import "highlight.js/styles/github-dark.css";
@@ -36,6 +39,7 @@ const app = document.querySelector<HTMLElement>("#app")!;
 
 app.innerHTML = `
   <header class="titlebar" data-tauri-drag-region>
+    <img class="brand-icon" src="${appIcon}" alt="" data-tauri-drag-region />
     <div class="tabs" data-tauri-drag-region></div>
   </header>
   <div class="workspace">
@@ -115,6 +119,9 @@ if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
 
 const vpn = new VpnChip(app.querySelector<HTMLElement>(".res-mini")!);
 new NetworkChip(app.querySelector<HTMLElement>(".res-mini")!);
+new TextSizeChip(app.querySelector<HTMLElement>(".res-mini")!, (fontSize, lineHeight) =>
+  tabs.applyTextSettings(fontSize, lineHeight),
+);
 const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
 );
@@ -250,6 +257,9 @@ function openNewSshProfile(): Promise<LauncherEntry | undefined> {
  * (T25); otherwise the list is shown and whichever entry the user picks opens.
  */
 async function start() {
+  // Before any tab opens, so the very first one is sized correctly and
+  // doesn't flash at the default before jumping to the saved size.
+  await loadTextSettings();
   const entry = (await resolveAutoOpen()) ?? (await new Launcher(app, openNewSshProfile).open());
   if (entry.kind === "local") await tabs.newTab();
   else await connectProfile(tabs, entry.profile, vpn);
