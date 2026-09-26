@@ -8,6 +8,7 @@ import {
 import type { HookEvent } from "../terminal/hook-events";
 import { showToast } from "./toast";
 import { checkReachable } from "./reachability";
+import { guardPaste } from "./paste-guard";
 import type { Level, ResourceTarget } from "./resource-chip";
 
 export type SessionTransport = "ssh" | "mosh";
@@ -84,6 +85,8 @@ export class TabManager {
   private active?: Tab;
   private nextId = 1;
   private readonly observers: TabObserver[] = [];
+  /** Copy on mouse release (config copyOnSelect). */
+  copyOnSelect = false;
   private readonly refs = new Map<Tab, TabRef>();
 
   constructor(
@@ -288,6 +291,9 @@ export class TabManager {
             for (const o of this.observers) o.onHookEvent(this.ref(tab), event);
             if (tab === this.active) this.events.onHookEvent(event);
           },
+          onPaste: (text) => {
+            if (tab.session) void guardPaste(tab.session, text);
+          },
           onScreenChange: () => {
             for (const o of this.observers) o.onScreenChange(this.ref(tab));
           },
@@ -295,6 +301,9 @@ export class TabManager {
         spec.options,
       );
       if (tab === this.active) tab.session.focus();
+      host.addEventListener("mouseup", () => {
+        if (this.copyOnSelect) void tab.session?.copySelection();
+      });
       this.setConnectionState(tab, "connected");
     } catch (err) {
       showToast(`터미널을 시작하지 못했습니다: ${err}`);

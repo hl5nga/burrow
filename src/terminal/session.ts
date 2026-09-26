@@ -8,6 +8,7 @@ import { installImeHandler } from "./ime";
 import { installInputEventLog } from "./devlog";
 import { HOOK_OSC, parseHookEvent, type HookEvent } from "./hook-events";
 import { BlockTracker } from "./blocks";
+import { copyText } from "../ui/clipboard";
 
 interface PtyExit {
   id: number;
@@ -15,6 +16,14 @@ interface PtyExit {
 }
 
 const FONT_SIZE = 13.5;
+
+/**
+ * Where copied text will be cleaned of secrets (T17, on hold). Kept as the one
+ * path every copy goes through so masking only has to be added here.
+ */
+function scrub(text: string): string {
+  return text;
+}
 
 // xterm measures the cell size once at open(), so the primary font must be ready
 // before that. Hangul glyphs come from unicode-range chunks that load lazily.
@@ -64,6 +73,10 @@ export interface TerminalSession {
   restart(): Promise<void>;
   /** The bottom `lines` rows of the live screen as plain text (no colors). */
   screenText(lines: number): string;
+  /** Copies the selection; false (and nothing copied) when there is none. */
+  copySelection(): Promise<boolean>;
+  /** Pastes as the terminal would, honoring bracketed paste mode. */
+  paste(text: string): void;
   /** Writes raw input to the process, as if typed. */
   send(data: string): void;
   /** Prints a dim status line into the terminal (not sent to the process). */
@@ -86,6 +99,11 @@ export interface SessionHandlers {
   onInputWhileStopped?(data: string): void;
   onContext?(context: SessionContext): void;
   onHookEvent?(event: HookEvent): void;
+  /**
+   * Clipboard text the user pasted, before it reaches the terminal; the handler
+   * decides whether to `paste()` it. Without a handler it is pasted as is.
+   */
+  onPaste?(text: string): void;
   /** Output was drawn; fires per write, so debounce before doing real work. */
   onScreenChange?(): void;
 }
@@ -163,6 +181,25 @@ export async function openTerminalSession(
     return true;
   });
   const ime = installImeHandler(term, container);
+
+  // Option-drag selects a column. When an app has the mouse (vim, htop, tmux
+  // with mouse on), Option instead forces a normal selection past it — xterm
+  // can do only one of the two, so pick per click, before xterm sees it.
+  const onMouseDown = (e: MouseEvent) => {
+    term.options.macOptionClickForcesSelection =
+      e.altKey && term.modes.mouseTrackingMode !== "none";
+  };
+  container.addEventListener("mousedown", onMouseDown, true);
+  // The native paste (Edit › Paste, ⌘V) lands on xterm's textarea; take it first.
+  const onPasteEvent = (e: ClipboardEvent) => {
+    const text = e.clipboardData?.getData("text/plain");
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!text) return;
+    if (handlers.onPaste) handlers.onPaste(text);
+    else term.paste(text);
+  };
+  container.addEventListener("paste", onPasteEvent, true);
   const removeDevLog = import.meta.env.DEV ? installInputEventLog(term) : () => {};
 
   // A newly loaded glyph chunk would otherwise keep its fallback-font rendering
@@ -254,6 +291,16 @@ export async function openTerminalSession(
       return rows.slice(-lines).join("\n");
     },
     send: (data) => write(data),
+    async copySelection() {
+      if (!term.hasSelection()) return false;
+      await copyText(scrub(term.getSelection()));
+      return true;
+    },
+    paste(text) {
+      ime.reset();
+      term.paste(text);
+      term.scrollToBottom();
+    },
     notice(text) {
       // Start on a fresh line; the remote side may have left the cursor anywhere.
       term.write(`\x1b[0m\r\n\x1b[2m${text}\x1b[0m\r\n`);
@@ -261,6 +308,8 @@ export async function openTerminalSession(
     focus: () => term.focus(),
     dispose() {
       observer.disconnect();
+      container.removeEventListener("mousedown", onMouseDown, true);
+      container.removeEventListener("paste", onPasteEvent, true);
       hookOsc.dispose();
       blocks.dispose();
       ime.dispose();

@@ -109,6 +109,8 @@ pub struct ConfigFile {
     pub version: u32,
     pub promotion_threshold: u32,
     pub frequent_panel_open: bool,
+    /// Copy a selection as soon as the mouse is released (Linux terminal habit).
+    pub copy_on_select: bool,
 }
 
 impl Default for ConfigFile {
@@ -117,6 +119,7 @@ impl Default for ConfigFile {
             version: CURRENT_VERSION,
             promotion_threshold: 5,
             frequent_panel_open: true,
+            copy_on_select: false,
         }
     }
 }
@@ -283,6 +286,12 @@ impl Default for GuardrailsFile {
                     r"terraform[[:space:]]+destroy",
                     Block,
                     "Terraform 인프라 삭제",
+                ),
+                rule(
+                    "preset-pipe-to-shell",
+                    r"(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z)?sh([[:space:]]|$)",
+                    Warn,
+                    "받은 스크립트를 바로 셸로 실행",
                 ),
             ],
         }

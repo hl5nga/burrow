@@ -129,6 +129,13 @@ pub fn write_local(store: &Store) -> std::io::Result<()> {
     Ok(())
 }
 
+/// The built-in rules, for checks that must hold even if the user's file
+/// predates a preset (paste scanning always includes pipe-to-shell).
+#[tauri::command]
+pub fn guardrail_presets() -> Vec<crate::store::GuardrailRule> {
+    GuardrailsFile::default().rules
+}
+
 /// Which rules a command line hits, by asking zsh — the same engine the hook
 /// uses. Also reports patterns zsh can't compile.
 #[derive(Serialize)]

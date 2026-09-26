@@ -7,7 +7,8 @@ export interface DialogButton<T extends string> {
 /** A small modal with a few choices; resolves with the chosen value, or undefined on Escape. */
 export function chooseDialog<T extends string>(
   title: string,
-  body: string[],
+  /** Paragraphs; `{ code }` renders as a monospace preview block. */
+  body: (string | { code: string })[],
   buttons: DialogButton<T>[],
   /** Closes the dialog from outside (resolving undefined), e.g. when it became moot. */
   signal?: AbortSignal,
@@ -22,10 +23,10 @@ export function chooseDialog<T extends string>(
     const heading = document.createElement("h3");
     heading.textContent = title;
     box.append(heading);
-    for (const text of body) {
-      const p = document.createElement("p");
-      p.textContent = text;
-      box.append(p);
+    for (const item of body) {
+      const node = document.createElement(typeof item === "string" ? "p" : "pre");
+      node.textContent = typeof item === "string" ? item : item.code;
+      box.append(node);
     }
     const row = document.createElement("div");
     row.className = "dialog-actions";

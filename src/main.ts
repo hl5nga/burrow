@@ -4,6 +4,7 @@ import "@fontsource/jetbrains-mono/700.css";
 import "./styles/fonts.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import type { SessionContext } from "./terminal/session";
 import { CommandPalette } from "./ui/palette";
 import { FrequentPanel } from "./ui/frequent-panel";
@@ -151,6 +152,15 @@ window.addEventListener(
       return;
     }
     switch (e.code) {
+      case "KeyC": {
+        // Only the terminal's own selection; text fields in panels copy natively.
+        const session = activeSession();
+        if (!session || !app.querySelector(".term-body")?.contains(e.target as Node)) return;
+        handled();
+        // No selection: nothing (on macOS, interrupting is Ctrl-C, not ⌘C).
+        void session.copySelection();
+        break;
+      }
       case "KeyK":
         handled();
         palette.toggle();
@@ -178,5 +188,8 @@ window.addEventListener(
 );
 
 void tabs.newTab().then(() => frequent.init());
+void invoke<{ copyOnSelect?: boolean }>("store_get", { kind: "config" }).then((c) => {
+  tabs.copyOnSelect = !!c.copyOnSelect;
+});
 void listen("network-changed", () => tabs.networkChanged());
 showStoreRecoveries();

@@ -42,7 +42,10 @@ fn missing_files_are_created_with_defaults_and_presets() {
     let store = Store::open(root.0.clone()).unwrap();
 
     assert_eq!(store.load::<ConfigFile>().promotion_threshold, 5);
-    assert_eq!(store.load::<GuardrailsFile>().rules.len(), 9);
+    assert_eq!(
+        store.load::<GuardrailsFile>().rules,
+        GuardrailsFile::default().rules
+    );
     assert_eq!(store.load::<SecretsPatternsFile>().patterns.len(), 5);
     assert_eq!(store.load::<KeybindingsFile>().bindings.len(), 18);
     assert!(store.load::<CommandsFile>().commands.is_empty());
@@ -107,7 +110,10 @@ fn a_corrupt_file_is_backed_up_and_recreated() {
     fs::write(root.0.join("guardrails.json"), broken).unwrap();
 
     let store = Store::open(root.0.clone()).unwrap();
-    assert_eq!(store.load::<GuardrailsFile>().rules.len(), 9);
+    assert_eq!(
+        store.load::<GuardrailsFile>().rules,
+        GuardrailsFile::default().rules
+    );
     assert_eq!(
         fs::read_to_string(root.0.join("guardrails.json.bak")).unwrap(),
         broken
