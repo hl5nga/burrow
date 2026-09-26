@@ -23,6 +23,7 @@ import { Launcher, resolveAutoOpen, type LauncherEntry } from "./ui/launcher";
 import { NetworkChip } from "./ui/network-chip";
 import { TextSizeChip } from "./ui/text-chip";
 import { loadTextSettings } from "./ui/text-settings";
+import { showAbout } from "./ui/about";
 import "./styles/launcher.css";
 import "./styles/files.css";
 import "highlight.js/styles/github-dark.css";
@@ -115,7 +116,8 @@ const tabs = new TabManager(
 );
 const activeSession = () => tabs.activeSession();
 // Dev builds: lets scripts/devctl read terminal state (e.g. `devctl screen`).
-if (import.meta.env.DEV) Object.assign(window, { __burrow: { tabs } });
+const devBag: Record<string, unknown> = { tabs };
+if (import.meta.env.DEV) Object.assign(window, { __burrow: devBag });
 
 const vpn = new VpnChip(app.querySelector<HTMLElement>(".res-mini")!);
 new NetworkChip(app.querySelector<HTMLElement>(".res-mini")!);
@@ -252,17 +254,37 @@ function openNewSshProfile(): Promise<LauncherEntry | undefined> {
   });
 }
 
+async function openEntry(entry: LauncherEntry) {
+  if (entry.kind === "local") await tabs.newTab();
+  else await connectProfile(tabs, entry.profile, vpn);
+}
+
 /**
  * Startup: a configured auto-open target skips the connection list entirely
  * (T25); otherwise the list is shown and whichever entry the user picks opens.
+ * Nothing to cancel back to yet, so the list isn't dismissible here.
  */
 async function start() {
   // Before any tab opens, so the very first one is sized correctly and
   // doesn't flash at the default before jumping to the saved size.
   await loadTextSettings();
-  const entry = (await resolveAutoOpen()) ?? (await new Launcher(app, openNewSshProfile).open());
-  if (entry.kind === "local") await tabs.newTab();
-  else await connectProfile(tabs, entry.profile, vpn);
+  const auto = await resolveAutoOpen();
+  if (auto) {
+    await openEntry(auto);
+  } else {
+    let entry: LauncherEntry | undefined;
+    while (!entry) entry = await new Launcher(app, openNewSshProfile).open();
+    await openEntry(entry);
+  }
   await frequent.init();
 }
 void start();
+
+/** Menu bar → Burrow → 연결 목록 보기: the same list, dismissible this time. */
+async function viewStartup() {
+  const entry = await new Launcher(app, openNewSshProfile, true).open();
+  if (entry) await openEntry(entry);
+}
+void listen("menu-view-startup", () => void viewStartup());
+void listen("menu-about", () => void showAbout());
+Object.assign(devBag, { showAbout, viewStartup });

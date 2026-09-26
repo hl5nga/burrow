@@ -103,6 +103,15 @@ pub fn run() {
         .manage(pty::PtyState::default())
         .manage(events::EventStreams::default())
         .menu(menu::build)
+        .on_menu_event(|app, event| {
+            use tauri::Emitter;
+            let id = event.id().as_ref();
+            if id == menu::ABOUT_ID {
+                let _ = app.emit("menu-about", ());
+            } else if id == menu::VIEW_STARTUP_ID {
+                let _ = app.emit("menu-view-startup", ());
+            }
+        })
         .setup(|app| {
             let store = Arc::new(store::Store::open(store::default_root())?);
             store.start_stats_flusher();

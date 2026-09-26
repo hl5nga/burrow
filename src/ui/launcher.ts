@@ -96,11 +96,18 @@ export class Launcher {
   private online = true;
   private pollTimer = 0;
 
-  private resolveEntry?: (entry: LauncherEntry) => void;
+  private resolveEntry?: (entry: LauncherEntry | undefined) => void;
 
   constructor(
     private readonly root: HTMLElement,
     private readonly onNewConnection?: NewConnectionHandler,
+    /**
+     * True when this is revisiting the list from a session already under
+     * way (menu bar → 연결 목록 보기), where Escape/clicking outside should
+     * just cancel back to whatever was on screen. False (the default) is the
+     * one-time startup gate, which has nothing to cancel back to.
+     */
+    private readonly dismissible = false,
   ) {
     const box = el("div", "launcher");
     const head = el("div", "launcher-head");
@@ -111,17 +118,32 @@ export class Launcher {
     box.append(head, sub, this.list);
     this.overlay.append(box);
     this.overlay.setAttribute("data-tauri-drag-region", "");
+    this.overlay.tabIndex = -1;
+    this.overlay.addEventListener("mousedown", (e) => {
+      if (this.dismissible && e.target === this.overlay) this.resolveEntry?.(undefined);
+    });
+    this.overlay.addEventListener("keydown", (e) => {
+      if (this.dismissible && e.key === "Escape") {
+        e.preventDefault();
+        this.resolveEntry?.(undefined);
+      }
+    });
   }
 
-  /** Renders the list and resolves once the user picks an entry to open. */
-  open(): Promise<LauncherEntry> {
+  /**
+   * Renders the list and resolves once the user picks an entry to open, or
+   * (only when `dismissible`) closes it without choosing.
+   */
+  open(): Promise<LauncherEntry | undefined> {
     this.root.append(this.overlay);
-    return new Promise<LauncherEntry>((resolve) => {
+    const previous = document.activeElement as HTMLElement | null;
+    return new Promise<LauncherEntry | undefined>((resolve) => {
       this.resolveEntry = resolve;
       void this.load();
     }).finally(() => {
       window.clearInterval(this.pollTimer);
       this.overlay.remove();
+      if (this.dismissible) previous?.focus();
     });
   }
 
