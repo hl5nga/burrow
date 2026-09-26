@@ -47,6 +47,18 @@ pub struct Command {
     pub tmux_session: Option<String>,
     pub transport: Transport,
     pub vpn_pre_connect: Option<String>,
+    /// Networks where the host is reachable without the VPN (by router).
+    pub home_networks: Vec<HomeNetwork>,
+}
+
+/// A network recognized by its router's hardware address: macOS hides the
+/// Wi-Fi name from apps without location access, the gateway's MAC it doesn't,
+/// and unlike a subnet like 192.168.1.x it isn't shared by other networks.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HomeNetwork {
+    pub gateway_mac: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

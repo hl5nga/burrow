@@ -1,6 +1,12 @@
 export type CommandType = "shell" | "ssh-profile";
 export type Transport = "auto" | "ssh" | "mosh";
 
+/** A network where the host is reachable without the VPN, by its router's MAC. */
+export interface HomeNetwork {
+  gatewayMac: string;
+  name: string;
+}
+
 export interface StoredCommand {
   id: string;
   name: string;
@@ -11,6 +17,7 @@ export interface StoredCommand {
   tmuxSession: string | null;
   transport: Transport;
   vpnPreConnect: string | null;
+  homeNetworks: HomeNetwork[];
 }
 
 export type FieldErrors = Partial<Record<keyof StoredCommand, string>>;
@@ -55,6 +62,7 @@ export function normalizeCommand(c: StoredCommand): StoredCommand {
     tmuxSession: ssh ? text(c.tmuxSession) : null,
     transport: ssh ? c.transport : "auto",
     vpnPreConnect: ssh ? text(c.vpnPreConnect) : null,
+    homeNetworks: ssh ? (c.homeNetworks ?? []) : [],
   };
 }
 
@@ -69,5 +77,6 @@ export function emptyCommand(type: CommandType = "shell"): StoredCommand {
     tmuxSession: null,
     transport: "auto",
     vpnPreConnect: null,
+    homeNetworks: [],
   };
 }

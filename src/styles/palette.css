@@ -55,7 +55,7 @@
 }
 
 .palette-search input::placeholder {
-  color: var(--text-dim);
+  color: var(--placeholder);
 }
 
 .palette-search .kbd {

@@ -169,6 +169,52 @@ pub fn vpn_toggle(kind: String, name: String, up: bool) -> Result<(), String> {
     }
 }
 
+#[derive(Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkFingerprint {
+    pub gateway: String,
+    pub gateway_mac: String,
+    pub interface: String,
+}
+
+fn parse_route(out: &str) -> Option<(String, String)> {
+    let field = |key: &str| {
+        out.lines()
+            .find_map(|l| l.trim().strip_prefix(key).map(|v| v.trim().to_string()))
+    };
+    Some((field("gateway:")?, field("interface:")?))
+}
+
+/// arp prints "? (192.168.1.1) at 3c:52:a1:0:e:9 on en0 ..." — octets may lack
+/// a leading zero; normalize so the same router always compares equal.
+fn parse_arp_mac(out: &str) -> Option<String> {
+    let mac = out.split(" at ").nth(1)?.split_whitespace().next()?;
+    let octets: Vec<String> = mac
+        .split(':')
+        .map(|o| format!("{:0>2}", o.to_lowercase()))
+        .collect();
+    let ok = octets.len() == 6
+        && octets
+            .iter()
+            .all(|o| o.len() == 2 && o.chars().all(|c| c.is_ascii_hexdigit()));
+    ok.then(|| octets.join(":"))
+}
+
+/// The network this Mac is on right now, identified by its default gateway's
+/// hardware address. None when offline or when the route has no gateway (VPN).
+#[tauri::command(async)]
+pub fn network_fingerprint() -> Option<NetworkFingerprint> {
+    let route = output(Command::new("route").args(["-n", "get", "default"]))?;
+    let (gateway, interface) = parse_route(&route)?;
+    gateway.parse::<std::net::IpAddr>().ok()?;
+    let arp = output(Command::new("arp").args(["-n", &gateway]))?;
+    Some(NetworkFingerprint {
+        gateway_mac: parse_arp_mac(&arp)?,
+        gateway,
+        interface,
+    })
+}
+
 /// Runs the profile's `vpnPreConnect` in a login shell (so Homebrew tools are on
 /// PATH), without a terminal: anything that asks for a password fails instead
 /// of hanging.
@@ -267,6 +313,27 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].name, "utun4");
         assert_eq!(found[0].detail.as_deref(), Some("100.101.1.2"));
+    }
+
+    #[test]
+    fn network_fingerprint_parsing() {
+        let route = "   route to: default\ndestination: default\n    gateway: 192.168.1.1\n  interface: en0\n";
+        assert_eq!(
+            parse_route(route),
+            Some(("192.168.1.1".into(), "en0".into()))
+        );
+        assert_eq!(
+            parse_arp_mac("? (192.168.1.1) at 3c:52:A1:0:e:9 on en0 ifscope [ethernet]").as_deref(),
+            Some("3c:52:a1:00:0e:09")
+        );
+        assert_eq!(
+            parse_arp_mac("? (192.168.1.1) at (incomplete) on en0"),
+            None
+        );
+        // This Mac, now: offline is fine, a malformed answer is not.
+        if let Some(fp) = network_fingerprint() {
+            assert_eq!(fp.gateway_mac.len(), 17);
+        }
     }
 
     #[test]

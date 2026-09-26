@@ -1,4 +1,6 @@
 :root {
+  /* Placeholders must read as hints, never as filled-in values. */
+  --placeholder: rgba(160, 166, 172, 0.32);
   --bg-panel: #111317;
   --bg-elevated: #15171b;
   --border: #24282e;
@@ -286,4 +288,10 @@ body::after {
   cursor: pointer;
   user-select: text;
   -webkit-user-select: text;
+}
+
+/* Every input and textarea in the app. */
+::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
 }

@@ -46,12 +46,12 @@ interface FieldSpec {
 
 const FIELDS: FieldSpec[] = [
   { key: "name", label: "이름", for: "both", placeholder: "예: 배포, 집 노트북" },
-  { key: "command", label: "명령", for: "shell", placeholder: "npm run deploy", mono: true },
+  { key: "command", label: "명령", for: "shell", placeholder: "예: npm run deploy", mono: true },
   {
     key: "sshHost",
     label: "SSH 호스트",
     for: "ssh-profile",
-    placeholder: "user@home-laptop.tailnet.ts.net",
+    placeholder: "예: user@home-laptop.tailnet.ts.net",
     hint: "원격 노트북이 잠들면 접속할 수 없습니다. 그쪽에서 시스템 설정 › 배터리 › 옵션의 '네트워크 접근 시 깨우기'를 켜거나 caffeinate -s를 실행해 두세요",
     mono: true,
   },
@@ -59,7 +59,7 @@ const FIELDS: FieldSpec[] = [
     key: "tmuxSession",
     label: "tmux 세션",
     for: "ssh-profile",
-    placeholder: "비워두면 tmux 없이 접속",
+    placeholder: "비워 두면 tmux 없이 접속",
     hint: "접속하면 이 이름의 tmux 세션에 자동으로 다시 붙습니다",
     mono: true,
   },
@@ -67,7 +67,7 @@ const FIELDS: FieldSpec[] = [
     key: "vpnPreConnect",
     label: "접속 전 VPN 명령",
     for: "ssh-profile",
-    placeholder: "tailscale up",
+    placeholder: '예: scutil --nc start "회사 VPN"',
     hint: '적어 둔 경우에만, 호스트에 닿지 않을 때 이 Mac에서 실행합니다. 예: tailscale up · scutil --nc start "회사 VPN" · wg-quick up home (sudo가 필요한 명령은 안 됩니다)',
     mono: true,
   },
@@ -292,6 +292,7 @@ export class CommandManager {
       this.form.append(field);
 
       if (spec.key === "sshHost") this.form.append(this.transportField());
+      if (spec.key === "vpnPreConnect") this.form.append(this.homeNetworksField());
     }
 
     const actions = el("div", "form-actions");
@@ -308,6 +309,55 @@ export class CommandManager {
       actions.append(del);
     }
     this.form.append(actions);
+  }
+
+  /** Networks where the VPN step is skipped; others always run it first. */
+  private homeNetworksField(): HTMLElement {
+    const field = el("div", "field");
+    field.append(el("label", undefined, "집 네트워크 (VPN 건너뜀)"));
+    const list = el("div", "home-nets");
+    const nets = this.draft.homeNetworks ?? [];
+    for (const net of nets) {
+      const chip = el("span", "home-net", net.name);
+      chip.title = `공유기 ${net.gatewayMac}`;
+      const remove = el("button", "home-net-x", "×");
+      remove.type = "button";
+      remove.title = "삭제";
+      remove.addEventListener("click", () => {
+        this.draft.homeNetworks = nets.filter((n) => n.gatewayMac !== net.gatewayMac);
+        this.renderForm();
+      });
+      chip.append(remove);
+      list.append(chip);
+    }
+    const add = el("button", "btn ghost", "＋ 지금 이 네트워크를 집으로");
+    add.type = "button";
+    add.addEventListener("click", async () => {
+      const fp = await invoke<{ gateway: string; gatewayMac: string } | null>(
+        "network_fingerprint",
+      );
+      if (!fp)
+        return showToast("지금 네트워크의 공유기를 알 수 없습니다 (오프라인이거나 VPN 경로)");
+      if (nets.some((n) => n.gatewayMac === fp.gatewayMac))
+        return showToast("이미 등록된 네트워크입니다");
+      this.draft.homeNetworks = [
+        ...nets,
+        { gatewayMac: fp.gatewayMac, name: `집 (${fp.gateway})` },
+      ];
+      this.renderForm();
+    });
+    list.append(add);
+    field.append(
+      list,
+      el(
+        "div",
+        "field-hint",
+        nets.length
+          ? "이 네트워크에서는 VPN 없이 바로 접속하고, 다른 네트워크에서는 접속 전에 항상 VPN 명령을 실행합니다. (공유기 주소로 알아봅니다 — macOS는 Wi-Fi 이름을 앱에 알려 주지 않습니다)"
+          : "등록하지 않으면 호스트에 닿지 않을 때만 VPN 명령을 실행합니다. 밖의 네트워크가 우연히 같은 주소 대역(예: 192.168.1.x)이면 잘못 판단할 수 있어, 집에서 한 번 등록해 두는 것을 권장합니다.",
+      ),
+    );
+    return field;
   }
 
   private transportField(): HTMLElement {

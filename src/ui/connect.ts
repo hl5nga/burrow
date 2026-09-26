@@ -18,15 +18,21 @@ interface RemoteProbe {
   localMosh: boolean;
 }
 
-const VPN_WAIT_MS = 15_000;
+const VPN_WAIT_MS = 30_000;
 
 /**
  * Runs the profile's own VPN command when the host can't be reached yet, then
  * waits for the host to answer. The command runs only when it is needed, and
  * never for profiles that don't have one.
  */
-async function bringUpVpn(profile: StoredCommand, label: string, vpn: VpnChip) {
-  showToast(`${label}에 닿지 않아 VPN 명령을 실행합니다: ${profile.vpnPreConnect}`);
+async function bringUpVpn(
+  profile: StoredCommand,
+  vpn: VpnChip,
+  why: string,
+  /** Off the home network an answer at a private address proves nothing, so wait for the tunnel itself. */
+  waitForTunnel = false,
+) {
+  showToast(`${why} VPN 명령을 실행합니다: ${profile.vpnPreConnect}`);
   try {
     await invoke("vpn_pre_connect", { profileId: profile.id });
   } catch (err) {
@@ -34,6 +40,11 @@ async function bringUpVpn(profile: StoredCommand, label: string, vpn: VpnChip) {
   }
   // Commands like `scutil --nc start` return before the tunnel is up.
   const deadline = Date.now() + VPN_WAIT_MS;
+  if (waitForTunnel) {
+    while (Date.now() < deadline && !(await vpn.refresh()).some((s) => s.connected)) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
   let reach = await checkReachable(profile.id, true);
   while (reach.state === "offline" && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 1000));
@@ -83,9 +94,20 @@ function chooseTransport(
 export async function connectProfile(tabs: TabManager, profile: StoredCommand, vpn: VpnChip) {
   const label = profile.name || profile.sshHost || "SSH";
   let reach = await checkReachable(profile.id, true);
-  // "unknown" (behind a proxy) could just as well need the VPN.
-  if (reach.state !== "online" && profile.vpnPreConnect?.trim()) {
-    reach = await bringUpVpn(profile, label, vpn);
+  if (profile.vpnPreConnect?.trim()) {
+    const homes = profile.homeNetworks ?? [];
+    if (homes.length) {
+      // Home networks are known: decide by where this Mac is, not by whether
+      // some device happens to answer at the host's (private) address.
+      const fp = await invoke<{ gatewayMac: string } | null>("network_fingerprint").catch(
+        () => null,
+      );
+      const atHome = !!fp && homes.some((h) => h.gatewayMac === fp.gatewayMac);
+      if (!atHome) reach = await bringUpVpn(profile, vpn, "집 네트워크가 아니라", true);
+    } else if (reach.state !== "online") {
+      // "unknown" (behind a proxy) could just as well need the VPN.
+      reach = await bringUpVpn(profile, vpn, `${label}에 닿지 않아`);
+    }
   }
   if (reach.state === "offline") {
     showToast(`${label} 오프라인 — ${reach.reason}`);

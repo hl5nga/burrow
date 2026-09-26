@@ -33,6 +33,10 @@ fn sample_command(i: usize) -> Command {
         tmux_session: Some("burrow".into()),
         transport: Transport::Mosh,
         vpn_pre_connect: Some("tailscale up".into()),
+        home_networks: vec![HomeNetwork {
+            gateway_mac: "3c:52:a1:00:0e:09".into(),
+            name: "집".into(),
+        }],
     }
 }
 
