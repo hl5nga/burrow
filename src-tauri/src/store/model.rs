@@ -422,6 +422,7 @@ impl Default for KeybindingsFile {
             bind("toggle-agent-dashboard", "Cmd+Shift+A"),
             bind("copy", "Cmd+C"),
             bind("open-keybindings", "Cmd+/"),
+            bind("toggle-file-browser", "Cmd+Shift+E"),
         ];
         bindings.extend((1..=9).map(|n| bind(&format!("select-tab-{n}"), &format!("Cmd+{n}"))));
         Self {

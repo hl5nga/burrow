@@ -1,6 +1,7 @@
 mod clip;
 #[cfg(debug_assertions)]
 mod devctl;
+mod files;
 mod guardrails;
 mod hooks;
 mod menu;
@@ -31,6 +32,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_record,
         stats::stats_top,
         clip::clip_image_save,
+        files::fs_list,
+        files::fs_read,
         guardrails::guardrail_test,
         guardrails::guardrail_presets,
         guardrails::remote_sync_guardrails,
@@ -62,6 +65,8 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_record,
         stats::stats_top,
         clip::clip_image_save,
+        files::fs_list,
+        files::fs_read,
         guardrails::guardrail_test,
         guardrails::guardrail_presets,
         guardrails::remote_sync_guardrails,

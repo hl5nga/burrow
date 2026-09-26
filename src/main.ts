@@ -17,6 +17,9 @@ import { AgentMonitor } from "./ui/agents";
 import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
 import { Keybindings } from "./ui/keybindings";
+import { FileBrowser } from "./ui/file-browser";
+import "./styles/files.css";
+import "highlight.js/styles/github-dark.css";
 import "./styles/agents.css";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
@@ -43,6 +46,8 @@ app.innerHTML = `
     <div class="seg transport" hidden></div>
   </footer>
 `;
+
+app.querySelector<HTMLElement>(".statusbar .cwd")!.addEventListener("click", () => files.toggle());
 
 const status = {
   host: app.querySelector<HTMLElement>(".statusbar .host-name")!,
@@ -86,6 +91,7 @@ const tabs = new TabManager(
   {
     onActiveContext: (context) => {
       showContext(context);
+      files.follow();
       resources.activeChanged();
       void frequent.refresh();
     },
@@ -121,6 +127,10 @@ const palette = new CommandPalette(
   (id) => manager.open(id, () => activeSession()?.focus()),
   connect,
 );
+const files = new FileBrowser(app.querySelector<HTMLElement>(".workspace")!, () => ({
+  target: tabs.activeTarget(),
+  session: activeSession(),
+}));
 const agents = new AgentMonitor(() => tabs.sshTabs());
 tabs.observe(agents);
 tabs.observe(new GuardrailPrompt());
@@ -162,6 +172,7 @@ keys.register({
   label: "단축키 설정",
   run: () => (keys.isOpen ? keys.close() : keys.open(focusTerminal)),
 });
+keys.register({ id: "toggle-file-browser", label: "파일 탐색 패널", run: () => files.toggle() });
 keys.register({ id: "new-tab", label: "새 탭", run: () => void tabs.newTab() });
 keys.register({ id: "close-tab", label: "탭 닫기", run: () => tabs.close() });
 keys.register({ id: "next-tab", label: "다음 탭", run: () => tabs.selectRelative(1) });
