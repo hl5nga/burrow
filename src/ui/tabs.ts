@@ -155,6 +155,32 @@ export class TabManager {
     });
   }
 
+  /**
+   * Saves the clipboard image as a file on the tab's host and pastes its path,
+   * which is how Claude Code and other CLIs take images.
+   */
+  private async pasteImage(tab: Tab) {
+    if (!tab.connection && tab.context.host !== "local") {
+      // ssh'd by hand from a local tab: Burrow can't reach that host.
+      showToast(
+        "직접 ssh로 들어간 셸이라 이미지를 올릴 수 없습니다. SSH 프로필 탭에서 붙여넣어 주세요",
+      );
+      return;
+    }
+    const where = tab.connection ? (tab.title ?? "원격") : "이 Mac";
+    showToast(`이미지를 ${where}에 저장하는 중…`);
+    try {
+      const path = await invoke<string>("clip_image_save", {
+        profileId: tab.connection?.profileId ?? null,
+      });
+      // Bracketed paste, no Enter: the user decides when to send it.
+      tab.session?.paste(path);
+      tab.session?.focus();
+    } catch (err) {
+      showToast(`이미지를 붙여넣지 못했습니다: ${err} — ⌘V로 다시 시도`);
+    }
+  }
+
   /** The active tab's host and folder, for per-host actions like hook installs. */
   activeTarget() {
     const tab = this.active;
@@ -291,6 +317,7 @@ export class TabManager {
             for (const o of this.observers) o.onHookEvent(this.ref(tab), event);
             if (tab === this.active) this.events.onHookEvent(event);
           },
+          onPasteImage: () => void this.pasteImage(tab),
           onPaste: (text) => {
             if (tab.session) void guardPaste(tab.session, text);
           },

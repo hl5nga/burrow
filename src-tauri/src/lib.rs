@@ -1,3 +1,4 @@
+mod clip;
 #[cfg(debug_assertions)]
 mod devctl;
 mod guardrails;
@@ -29,6 +30,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::keybinding_defaults,
         stats::stats_record,
         stats::stats_top,
+        clip::clip_image_save,
         guardrails::guardrail_test,
         guardrails::guardrail_presets,
         guardrails::remote_sync_guardrails,
@@ -59,6 +61,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         store::keybinding_defaults,
         stats::stats_record,
         stats::stats_top,
+        clip::clip_image_save,
         guardrails::guardrail_test,
         guardrails::guardrail_presets,
         guardrails::remote_sync_guardrails,

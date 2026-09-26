@@ -104,6 +104,8 @@ export interface SessionHandlers {
    * decides whether to `paste()` it. Without a handler it is pasted as is.
    */
   onPaste?(text: string): void;
+  /** The clipboard held an image and no text (e.g. a screenshot). */
+  onPasteImage?(): void;
   /** Output was drawn; fires per write, so debounce before doing real work. */
   onScreenChange?(): void;
 }
@@ -192,9 +194,14 @@ export async function openTerminalSession(
   container.addEventListener("mousedown", onMouseDown, true);
   // The native paste (Edit › Paste, ⌘V) lands on xterm's textarea; take it first.
   const onPasteEvent = (e: ClipboardEvent) => {
-    const text = e.clipboardData?.getData("text/plain");
+    const data = e.clipboardData;
+    const text = data?.getData("text/plain");
     e.preventDefault();
     e.stopImmediatePropagation();
+    // A screenshot comes with no text. (A file copied in Finder has both an
+    // icon image and its name as text; that stays a text paste.)
+    const image = !!data && [...data.items].some((i) => i.type.startsWith("image/"));
+    if (!text && image && handlers.onPasteImage) return handlers.onPasteImage();
     if (!text) return;
     if (handlers.onPaste) handlers.onPaste(text);
     else term.paste(text);
