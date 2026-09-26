@@ -22,6 +22,8 @@ pub struct VpnService {
     /// "macOS" (System Settings VPN), "Tailscale", or "utun" (unknown client).
     pub kind: String,
     pub connected: bool,
+    /// Coming up or going down right now (macOS reports it; others don't).
+    pub transitioning: bool,
     /// Extra detail, e.g. the tailnet name or the interface's address.
     pub detail: Option<String>,
 }
@@ -37,6 +39,7 @@ fn parse_scutil(out: &str) -> Vec<VpnService> {
                 name: name.to_string(),
                 kind: "macOS".into(),
                 connected: state == "Connected",
+                transitioning: matches!(state, "Connecting" | "Disconnecting"),
                 detail: None,
             })
         })
@@ -65,6 +68,7 @@ fn parse_tailscale(json: &str) -> Option<VpnService> {
         name: "Tailscale".into(),
         kind: "Tailscale".into(),
         connected: state == "Running",
+        transitioning: state == "Starting",
         detail,
     })
 }
@@ -85,6 +89,7 @@ fn parse_utun(ifconfig: &str) -> Vec<VpnService> {
                 name: name.to_string(),
                 kind: "utun".into(),
                 connected: true,
+                transitioning: false,
                 detail: addr.split_whitespace().next().map(str::to_string),
             });
             current = None;
@@ -120,6 +125,48 @@ pub fn vpn_status() -> Vec<VpnService> {
         }
     }
     services
+}
+
+/// Connects or disconnects one VPN the user picked in the chip's card. Only a
+/// service that exists right now can be named, and it goes to scutil/tailscale
+/// as an argument, never through a shell.
+#[tauri::command(async)]
+pub fn vpn_toggle(kind: String, name: String, up: bool) -> Result<(), String> {
+    let out = match kind.as_str() {
+        "macOS" => {
+            let listed = output(Command::new("scutil").args(["--nc", "list"]))
+                .map(|o| parse_scutil(&o))
+                .unwrap_or_default();
+            if !listed.iter().any(|s| s.name == name) {
+                return Err(format!("'{name}' VPN을 찾을 수 없습니다"));
+            }
+            Command::new("scutil")
+                .args(["--nc", if up { "start" } else { "stop" }, &name])
+                .stdin(Stdio::null())
+                .output()
+        }
+        "Tailscale" => {
+            let cli = tailscale_cli().ok_or("tailscale CLI를 찾을 수 없습니다")?;
+            Command::new(cli)
+                .arg(if up { "up" } else { "down" })
+                .stdin(Stdio::null())
+                .output()
+        }
+        _ => return Err("이 VPN은 Burrow에서 켜고 끌 수 없습니다".into()),
+    }
+    .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        let err = String::from_utf8_lossy(&out.stderr);
+        let out_text = String::from_utf8_lossy(&out.stdout);
+        let reason = err
+            .lines()
+            .chain(out_text.lines())
+            .map(str::trim)
+            .find(|l| !l.is_empty());
+        Err(reason.unwrap_or("실패").to_string())
+    }
 }
 
 /// Runs the profile's `vpnPreConnect` in a login shell (so Homebrew tools are on
@@ -188,14 +235,14 @@ mod tests {
     fn scutil_services_and_states() {
         let out = r#"Available network connection services in the current set (*=enabled):
 * (Disconnected)   433F9543-CD7C-4D19-8BB5-5ACDDADDEEE8 VPN (com.draytek.SmartVPN) "Vigor HOME"                     [VPN:com.draytek.SmartVPN]
-* (Connected)      08A90D4A-20D7-4077-A15A-7AAE88E26D18 PPP --> L2TP       "회사 VPN"                            [PPP:L2TP]
+* (Connecting)     08A90D4A-20D7-4077-A15A-7AAE88E26D18 PPP --> L2TP       "회사 VPN"                            [PPP:L2TP]
 "#;
         let services = parse_scutil(out);
         assert_eq!(services.len(), 2);
         assert_eq!(services[0].name, "Vigor HOME");
         assert!(!services[0].connected);
         assert_eq!(services[1].name, "회사 VPN");
-        assert!(services[1].connected);
+        assert!(!services[1].connected && services[1].transitioning);
     }
 
     #[test]
