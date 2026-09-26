@@ -272,3 +272,25 @@ fn killing_the_writer_mid_write_leaves_a_valid_file() {
         assert!(file.commands.is_empty() || file.commands.len() == 2000);
     }
 }
+
+#[test]
+fn agent_presets_fill_files_written_before_them() {
+    let root = TempRoot::new();
+    let store = Store::open(root.0.clone()).unwrap();
+    fs::write(
+        root.0.join("agent-patterns.json"),
+        r#"{"version":1,"tools":{}}"#,
+    )
+    .unwrap();
+    let value = store.get_json("agent-patterns").unwrap();
+    let tools = value["tools"].as_object().unwrap();
+    assert!(tools.contains_key("claude-code"));
+    assert_eq!(tools["claude-code"]["commands"][0], "claude");
+    assert!(
+        tools["claude-code"]["waitingApproval"]
+            .as_array()
+            .unwrap()
+            .len()
+            > 0
+    );
+}

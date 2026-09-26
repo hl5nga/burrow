@@ -1,0 +1,41 @@
+{
+  "claude-code": {
+    "label": "Claude Code",
+    "commands": ["claude"],
+    "detect": ["Claude Code", "\\? for shortcuts"],
+    "waitingApproval": [
+      "Do you want to (proceed|make this edit|create|allow|run)",
+      "Would you like to proceed\\?"
+    ],
+    "working": ["esc to interrupt", "^[✻✽✢✶✳·*] \\S.*…"],
+    "error": ["API Error", "^\\s*⎿\\s+Error:"],
+    "idle": ["\\? for shortcuts"]
+  },
+  "codex": {
+    "label": "Codex",
+    "commands": ["codex"],
+    "detect": ["OpenAI Codex"],
+    "waitingApproval": ["Allow command\\?", "Would you like to (run|make) ", "approve this"],
+    "working": ["esc to interrupt", "Working \\("],
+    "error": ["stream error", "^\\s*■ "],
+    "idle": ["send (a )?message", "⏎ send"]
+  },
+  "gemini-cli": {
+    "label": "Gemini CLI",
+    "commands": ["gemini"],
+    "detect": ["Gemini CLI"],
+    "waitingApproval": ["Allow execution", "Apply this change\\?", "Do you want to proceed"],
+    "working": ["esc to cancel"],
+    "error": ["✕ \\[API Error"],
+    "idle": ["Type your message"]
+  },
+  "aider": {
+    "label": "Aider",
+    "commands": ["aider"],
+    "detect": ["^Aider v\\d"],
+    "waitingApproval": ["\\(Y\\)es/\\(N\\)o"],
+    "working": ["Waiting for .*…"],
+    "error": ["litellm\\.\\w+Error"],
+    "idle": ["^(architect|code|ask)?> $"]
+  }
+}

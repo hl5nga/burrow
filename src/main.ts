@@ -12,6 +12,8 @@ import { TabManager, type Connection } from "./ui/tabs";
 import { connectProfile } from "./ui/connect";
 import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
+import { AgentMonitor } from "./ui/agents";
+import "./styles/agents.css";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
@@ -109,6 +111,8 @@ const palette = new CommandPalette(
   (id) => manager.open(id, () => activeSession()?.focus()),
   connect,
 );
+const agents = new AgentMonitor();
+tabs.observe(agents);
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
 
 // Matched on physical keys so shortcuts still work with a Korean input source.
@@ -121,7 +125,10 @@ window.addEventListener(
       e.stopPropagation();
     };
     if (e.shiftKey) {
-      if (e.code === "BracketRight") {
+      if (e.code === "KeyA") {
+        handled();
+        agents.toggle();
+      } else if (e.code === "BracketRight") {
         handled();
         tabs.selectRelative(1);
       } else if (e.code === "BracketLeft") {

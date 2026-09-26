@@ -127,15 +127,25 @@ impl StoreFile for ConfigFile {
 
 // ---------- agent-patterns.json ----------
 
+/// Screen-text regexes for one AI CLI. Nothing about a tool's wording lives
+/// in code: when a CLI changes its UI, only this file needs editing.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AgentPattern {
+    /// Name shown on the dashboard.
+    pub label: String,
+    /// First word of a command that starts this tool (from the exec hook).
+    pub commands: Vec<String>,
+    /// Screen text that identifies the tool when no exec event says so
+    /// (inside tmux, or on hosts without hooks).
+    pub detect: Vec<String>,
     pub waiting_approval: Vec<String>,
     pub working: Vec<String>,
     pub error: Vec<String>,
+    /// The tool finished its turn and waits for the next instruction.
+    pub idle: Vec<String>,
 }
 
-/// Tool presets arrive with the agent dashboard (T14); until then the file is empty.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AgentPatternsFile {
@@ -144,11 +154,17 @@ pub struct AgentPatternsFile {
     pub tools: HashMap<String, AgentPattern>,
 }
 
+/// Wording as of mid-2026; a best effort, meant to be edited. The same JSON
+/// feeds the frontend's classifier tests.
+pub fn agent_presets() -> HashMap<String, AgentPattern> {
+    serde_json::from_str(include_str!("agent-presets.json")).expect("agent-presets.json is valid")
+}
+
 impl Default for AgentPatternsFile {
     fn default() -> Self {
         Self {
             version: CURRENT_VERSION,
-            tools: HashMap::new(),
+            tools: agent_presets(),
         }
     }
 }

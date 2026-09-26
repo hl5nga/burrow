@@ -48,6 +48,23 @@ interface Tab {
   connection?: ConnectionControl;
 }
 
+/** What tab-level observers (the agent monitor) get to see of a tab. */
+export interface TabRef {
+  id: number;
+  label(): string;
+  session(): TerminalSession | undefined;
+  isActive(): boolean;
+  select(): void;
+  /** Adds, updates or removes (undefined) a small badge next to the label. */
+  setBadge(kind: string | undefined, title?: string): void;
+}
+
+export interface TabObserver {
+  onHookEvent(tab: TabRef, event: HookEvent): void;
+  onScreenChange(tab: TabRef): void;
+  onClosed(tab: TabRef): void;
+}
+
 export interface TabEvents {
   /** The active tab changed, or the active tab's context did. */
   onActiveContext(context: SessionContext | undefined): void;
@@ -66,6 +83,8 @@ export class TabManager {
   private tabs: Tab[] = [];
   private active?: Tab;
   private nextId = 1;
+  private readonly observers: TabObserver[] = [];
+  private readonly refs = new Map<Tab, TabRef>();
 
   constructor(
     private readonly bar: HTMLElement,
@@ -78,6 +97,35 @@ export class TabManager {
     add.title = "새 탭 (⌘T)";
     add.addEventListener("click", () => void this.newTab());
     this.bar.append(add);
+  }
+
+  observe(observer: TabObserver) {
+    this.observers.push(observer);
+  }
+
+  private ref(tab: Tab): TabRef {
+    let ref = this.refs.get(tab);
+    if (!ref) {
+      ref = {
+        id: tab.id,
+        label: () => tab.label.textContent ?? "",
+        session: () => tab.session,
+        isActive: () => tab === this.active,
+        select: () => this.tabs.includes(tab) && this.activate(tab),
+        setBadge: (kind, title) => {
+          let badge = tab.element.querySelector<HTMLElement>(".agent-badge");
+          if (!kind) return badge?.remove();
+          if (!badge) {
+            badge = document.createElement("span");
+            tab.element.insertBefore(badge, tab.label.nextSibling);
+          }
+          badge.className = `agent-badge ${kind}`;
+          badge.title = title ?? "";
+        },
+      };
+      this.refs.set(tab, ref);
+    }
+    return ref;
   }
 
   activeSession(): TerminalSession | undefined {
@@ -216,7 +264,11 @@ export class TabManager {
             if (tab === this.active) this.events.onActiveContext(context);
           },
           onHookEvent: (event) => {
+            for (const o of this.observers) o.onHookEvent(this.ref(tab), event);
             if (tab === this.active) this.events.onHookEvent(event);
+          },
+          onScreenChange: () => {
+            for (const o of this.observers) o.onScreenChange(this.ref(tab));
           },
         },
         spec.options,
@@ -234,6 +286,8 @@ export class TabManager {
     const index = this.tabs.indexOf(tab);
     this.tabs.splice(index, 1);
     window.clearTimeout(tab.connection?.timer);
+    for (const o of this.observers) o.onClosed(this.ref(tab));
+    this.refs.delete(tab);
     tab.session?.dispose();
     tab.host.remove();
     tab.element.remove();

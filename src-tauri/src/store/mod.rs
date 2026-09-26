@@ -192,7 +192,14 @@ impl Store {
             "commands" => serde_json::to_value(self.load::<CommandsFile>()),
             "stats" => serde_json::to_value(self.stats()),
             "config" => serde_json::to_value(self.load::<ConfigFile>()),
-            "agent-patterns" => serde_json::to_value(self.load::<AgentPatternsFile>()),
+            "agent-patterns" => {
+                let mut file = self.load::<AgentPatternsFile>();
+                // Files written before the presets existed (T14) have none.
+                if file.tools.is_empty() {
+                    file.tools = model::agent_presets();
+                }
+                serde_json::to_value(file)
+            }
             "guardrails" => serde_json::to_value(self.load::<GuardrailsFile>()),
             "secrets-patterns" => serde_json::to_value(self.load::<SecretsPatternsFile>()),
             "keybindings" => serde_json::to_value(self.load::<KeybindingsFile>()),

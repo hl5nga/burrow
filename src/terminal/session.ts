@@ -62,6 +62,8 @@ export interface TerminalSession {
   run(command: string): void;
   /** Starts the process again in the same terminal, e.g. after a dropped connection. */
   restart(): Promise<void>;
+  /** The bottom `lines` rows of the live screen as plain text (no colors). */
+  screenText(lines: number): string;
   /** Prints a dim status line into the terminal (not sent to the process). */
   notice(text: string): void;
   focus(): void;
@@ -82,6 +84,8 @@ export interface SessionHandlers {
   onInputWhileStopped?(data: string): void;
   onContext?(context: SessionContext): void;
   onHookEvent?(event: HookEvent): void;
+  /** Output was drawn; fires per write, so debounce before doing real work. */
+  onScreenChange?(): void;
 }
 
 export interface SessionOptions {
@@ -191,6 +195,7 @@ export async function openTerminalSession(
     if (alive) invoke("pty_write", { id, data });
     else handlers.onInputWhileStopped?.(data);
   });
+  const writeSub = term.onWriteParsed(() => handlers.onScreenChange?.());
   const resizeSub = term.onResize(({ cols, rows }) => {
     if (alive) invoke("pty_resize", { id, cols, rows });
   });
@@ -232,6 +237,16 @@ export async function openTerminalSession(
       id = await spawnProcess();
       alive = true;
     },
+    screenText(lines) {
+      const buffer = term.buffer.active;
+      const rows: string[] = [];
+      // baseY is the top of the live screen, wherever the user has scrolled to.
+      for (let y = buffer.baseY; y < buffer.baseY + term.rows; y++) {
+        rows.push(buffer.getLine(y)?.translateToString(true) ?? "");
+      }
+      while (rows.length && !rows[rows.length - 1].trim()) rows.pop();
+      return rows.slice(-lines).join("\n");
+    },
     notice(text) {
       // Start on a fresh line; the remote side may have left the cursor anywhere.
       term.write(`\x1b[0m\r\n\x1b[2m${text}\x1b[0m\r\n`);
@@ -245,6 +260,7 @@ export async function openTerminalSession(
       removeDevLog();
       document.fonts.removeEventListener("loadingdone", onFontsLoaded);
       dataSub.dispose();
+      writeSub.dispose();
       resizeSub.dispose();
       unlistenExit();
       if (alive) invoke("pty_kill", { id });
