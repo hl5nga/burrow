@@ -324,7 +324,9 @@
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  z-index: 900;
+  /* Highest in the app: chooseDialog must always be answerable, even when it
+     fires while another overlay (e.g. the launcher, z-index 950) is open. */
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
