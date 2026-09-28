@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   emptyCommand,
   normalizeCommand,
+  suggestVpnDisconnect,
   validateCommand,
   type CommandType,
   type FieldErrors,
@@ -69,6 +70,14 @@ const FIELDS: FieldSpec[] = [
     for: "ssh-profile",
     placeholder: '예: scutil --nc start "회사 VPN"',
     hint: '적어 둔 경우에만, 호스트에 닿지 않을 때 이 Mac에서 실행합니다. 예: tailscale up · scutil --nc start "회사 VPN" · wg-quick up home (sudo가 필요한 명령은 안 됩니다)',
+    mono: true,
+  },
+  {
+    key: "vpnPostDisconnect",
+    label: "연결 종료 시 VPN 끄기 명령",
+    for: "ssh-profile",
+    placeholder: '예: scutil --nc stop "회사 VPN"',
+    hint: "비워 두면 Burrow가 VPN을 스스로 끄지 않습니다. 채워두면, 이 VPN을 쓰는 탭이 하나도 안 남았을 때(탭을 닫거나 Burrow를 종료할 때) 자동으로 실행합니다.",
     mono: true,
   },
   { key: "description", label: "설명", for: "both", multiline: true },
@@ -305,6 +314,20 @@ export class CommandManager {
 
       if (spec.key === "sshHost") this.form.append(this.transportField());
       if (spec.key === "vpnPreConnect") this.form.append(this.homeNetworksField());
+      if (spec.key === "vpnPostDisconnect") {
+        const suggest = el("button", "btn ghost vpn-suggest", "접속 명령에서 자동으로 채우기");
+        suggest.type = "button";
+        suggest.addEventListener("click", () => {
+          const guess = suggestVpnDisconnect(this.draft.vpnPreConnect ?? "");
+          if (guess) {
+            this.draft.vpnPostDisconnect = guess;
+            this.renderForm();
+          } else {
+            showToast("이 접속 명령에서는 자동으로 반대 명령을 못 만듭니다 — 직접 입력해 주세요");
+          }
+        });
+        field.append(suggest);
+      }
     }
 
     const actions = el("div", "form-actions");

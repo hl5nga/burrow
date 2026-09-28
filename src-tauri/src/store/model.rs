@@ -47,6 +47,10 @@ pub struct Command {
     pub tmux_session: Option<String>,
     pub transport: Transport,
     pub vpn_pre_connect: Option<String>,
+    /// Run when the last tab using this VPN closes (T31). Optional — an empty
+    /// value means Burrow never turns this VPN off on its own, only a
+    /// profile the user explicitly filled this in for is auto-disconnected.
+    pub vpn_post_disconnect: Option<String>,
     /// Networks where the host is reachable without the VPN (by router).
     pub home_networks: Vec<HomeNetwork>,
 }

@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emptyCommand, normalizeCommand, validateCommand } from "./command-validation.ts";
+import {
+  emptyCommand,
+  normalizeCommand,
+  suggestVpnDisconnect,
+  validateCommand,
+} from "./command-validation.ts";
 
 const ssh = (sshHost: string, tmuxSession: string | null = null) => ({
   ...emptyCommand("ssh-profile"),
@@ -66,4 +71,18 @@ test("normalizing drops fields that do not apply to the type", () => {
   assert.equal(profile.command, "");
   assert.equal(profile.sshHost, "host");
   assert.equal(profile.tmuxSession, null);
+});
+
+test("known VPN connect commands get a matching disconnect suggestion", () => {
+  assert.equal(suggestVpnDisconnect('scutil --nc start "회사 VPN"'), 'scutil --nc stop "회사 VPN"');
+  assert.equal(suggestVpnDisconnect("scutil --nc start HomeVPN"), "scutil --nc stop HomeVPN");
+  assert.equal(suggestVpnDisconnect("tailscale up"), "tailscale down");
+  assert.equal(suggestVpnDisconnect("tailscale up --accept-routes"), "tailscale down");
+  assert.equal(suggestVpnDisconnect("  tailscale up  "), "tailscale down");
+});
+
+test("unrecognized VPN commands get no suggestion, never a guess", () => {
+  assert.equal(suggestVpnDisconnect("wg-quick up home"), null);
+  assert.equal(suggestVpnDisconnect("./my-vpn-script.sh"), null);
+  assert.equal(suggestVpnDisconnect(""), null);
 });

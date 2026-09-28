@@ -116,7 +116,14 @@ const tabs = new TabManager(
       resources.activeChanged();
       updateAgentStatusBar();
     },
-    confirmCloseLastTab: confirmCloseWindow,
+    confirmCloseLastTab: async () => {
+      if (!(await confirmCloseWindow())) return false;
+      // remove() goes on to call onLastTabClosed() -> window.close(), which
+      // would otherwise hit the same native CloseRequested interception
+      // (lib.rs's ConfirmedExit) and ask a second, redundant time.
+      await invoke("confirm_exit").catch(() => {});
+      return true;
+    },
     onLastTabClosed: () => getCurrentWindow().close(),
   },
 );
@@ -327,6 +334,10 @@ void listen("confirm-quit", () => void handleConfirmQuit());
 /** The Rust side already prevented the actual close; this decides whether it may proceed. */
 async function handleConfirmQuit() {
   if (!(await confirmCloseWindow())) return;
+  // This path (red button, ⌘Q, Dock Quit, menu 종료) skips each tab's own
+  // teardown, so the per-tab VPN check in tabs.close() never runs — do it
+  // once here instead, for every VPN any open tab currently has engaged.
+  await tabs.disconnectAllVpns();
   await invoke("confirm_exit").catch(() => {});
   await getCurrentWindow().close();
 }

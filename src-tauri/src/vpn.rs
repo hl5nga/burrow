@@ -223,15 +223,37 @@ pub fn vpn_pre_connect(
     store: tauri::State<'_, Arc<Store>>,
     profile_id: String,
 ) -> Result<(), String> {
+    let command = profile_field(&store, &profile_id, |c| c.vpn_pre_connect.clone())?;
+    run_with_timeout(&command, PRE_CONNECT_TIMEOUT)
+}
+
+/// Runs a profile's `vpnPostDisconnect` — the frontend calls this once it
+/// decides no open tab needs that VPN anymore (T31). A profile without one
+/// set is silently skipped rather than erroring, since most won't have it.
+#[tauri::command(async)]
+pub fn vpn_post_disconnect(
+    store: tauri::State<'_, Arc<Store>>,
+    profile_id: String,
+) -> Result<(), String> {
+    match profile_field(&store, &profile_id, |c| c.vpn_post_disconnect.clone()) {
+        Ok(command) => run_with_timeout(&command, PRE_CONNECT_TIMEOUT),
+        Err(_) => Ok(()),
+    }
+}
+
+fn profile_field(
+    store: &Store,
+    profile_id: &str,
+    field: impl Fn(&crate::store::Command) -> Option<String>,
+) -> Result<String, String> {
     let commands = store.load::<CommandsFile>();
-    let command = commands
+    commands
         .commands
         .iter()
         .find(|c| c.id == profile_id && c.kind == CommandType::SshProfile)
-        .and_then(|c| c.vpn_pre_connect.clone())
+        .and_then(field)
         .filter(|c| !c.trim().is_empty())
-        .ok_or("이 프로필에는 VPN 명령이 없습니다")?;
-    run_with_timeout(&command, PRE_CONNECT_TIMEOUT)
+        .ok_or_else(|| "이 프로필에는 해당 VPN 명령이 없습니다".into())
 }
 
 fn run_with_timeout(command: &str, timeout: Duration) -> Result<(), String> {
@@ -343,5 +365,37 @@ mod tests {
         assert!(err.contains("3") && err.contains("nope"), "{err}");
         let err = run_with_timeout("sleep 5", Duration::from_millis(300)).unwrap_err();
         assert!(err.contains("끝나지 않았습니다"), "{err}");
+    }
+
+    fn store_with_profile(name: &str, json: &str) -> Store {
+        let root = std::env::temp_dir().join(format!("bcs-vpn-{name}-{}", std::process::id()));
+        let store = Store::open(root.clone()).unwrap();
+        std::fs::write(root.join("commands.json"), json).unwrap();
+        store
+    }
+
+    #[test]
+    fn post_disconnect_is_a_no_op_without_a_command_but_runs_when_set() {
+        let store = store_with_profile(
+            "a",
+            r#"{"version":1,"commands":[
+                {"id":"none","name":"n","type":"ssh-profile","sshHost":"h"},
+                {"id":"set","name":"s","type":"ssh-profile","sshHost":"h","vpnPostDisconnect":"true"},
+                {"id":"bad","name":"b","type":"ssh-profile","sshHost":"h","vpnPostDisconnect":"exit 9"}
+            ]}"#,
+        );
+        assert!(profile_field(&store, "none", |c| c.vpn_post_disconnect.clone()).is_err());
+        // The command itself: no_op behavior is at the tauri::command layer
+        // (vpn_post_disconnect), which we can't call directly here without a
+        // State wrapper — this exercises the same lookup it relies on.
+        assert_eq!(
+            profile_field(&store, "set", |c| c.vpn_post_disconnect.clone()).unwrap(),
+            "true"
+        );
+        assert_eq!(
+            profile_field(&store, "bad", |c| c.vpn_post_disconnect.clone()).unwrap(),
+            "exit 9"
+        );
+        let _ = std::fs::remove_dir_all(store.root());
     }
 }

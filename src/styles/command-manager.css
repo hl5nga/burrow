@@ -608,3 +608,8 @@
   display: flex;
   justify-content: center;
 }
+
+.vpn-suggest {
+  margin-top: 6px;
+  font-size: 11px;
+}

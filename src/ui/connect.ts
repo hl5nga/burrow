@@ -94,6 +94,10 @@ function chooseTransport(
 export async function connectProfile(tabs: TabManager, profile: StoredCommand, vpn: VpnChip) {
   const label = profile.name || profile.sshHost || "SSH";
   let reach = await checkReachable(profile.id, true);
+  // Set only when this connect actually ran vpnPreConnect — the disconnect
+  // side (T31) must never fire for a tab that never touched the VPN, e.g.
+  // one that connected straight from the home network.
+  let vpnEngaged = false;
   if (profile.vpnPreConnect?.trim()) {
     const homes = profile.homeNetworks ?? [];
     if (homes.length) {
@@ -103,9 +107,13 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
         () => null,
       );
       const atHome = !!fp && homes.some((h) => h.gatewayMac === fp.gatewayMac);
-      if (!atHome) reach = await bringUpVpn(profile, vpn, "집 네트워크가 아니라", true);
+      if (!atHome) {
+        vpnEngaged = true;
+        reach = await bringUpVpn(profile, vpn, "집 네트워크가 아니라", true);
+      }
     } else if (reach.state !== "online") {
       // "unknown" (behind a proxy) could just as well need the VPN.
+      vpnEngaged = true;
       reach = await bringUpVpn(profile, vpn, `${label}에 닿지 않아`);
     }
   }
@@ -164,5 +172,13 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
     );
   }
   const transport = chooseTransport(profile, probe, label);
-  await tabs.newSshTab(profile.id, label, withHooks, transport, probe.moshServerPath);
+  const vpnDisconnect = vpnEngaged ? (profile.vpnPostDisconnect?.trim() ?? null) : null;
+  await tabs.newSshTab(
+    profile.id,
+    label,
+    withHooks,
+    transport,
+    probe.moshServerPath,
+    vpnDisconnect,
+  );
 }

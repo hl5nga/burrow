@@ -12,6 +12,7 @@ export function confirmCloseWindow(): Promise<boolean> {
     [
       "열려 있는 로컬 터미널 세션이 모두 종료됩니다.",
       "SSH로 연결한 원격 tmux 세션은 서버에 그대로 남아 있어, 나중에 다시 접속하면 이어집니다.",
+      "프로필에 '연결 종료 시 VPN 끄기 명령'을 적어 둔 경우, 더 이상 쓰는 탭이 없는 VPN은 함께 해제됩니다.",
     ],
     [
       { value: "cancel", label: "취소", kind: "ghost" },

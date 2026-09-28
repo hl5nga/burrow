@@ -17,6 +17,9 @@ export interface StoredCommand {
   tmuxSession: string | null;
   transport: Transport;
   vpnPreConnect: string | null;
+  /** Run once no open tab needs this VPN anymore (T31). Optional — empty
+   * means Burrow never turns this VPN off on its own. */
+  vpnPostDisconnect: string | null;
   homeNetworks: HomeNetwork[];
 }
 
@@ -62,8 +65,23 @@ export function normalizeCommand(c: StoredCommand): StoredCommand {
     tmuxSession: ssh ? text(c.tmuxSession) : null,
     transport: ssh ? c.transport : "auto",
     vpnPreConnect: ssh ? text(c.vpnPreConnect) : null,
+    vpnPostDisconnect: ssh ? text(c.vpnPostDisconnect) : null,
     homeNetworks: ssh ? (c.homeNetworks ?? []) : [],
   };
+}
+
+/**
+ * A best-effort reverse of a `vpnPreConnect` value, for the manager form to
+ * suggest (never applied silently — the user sees and can edit/clear it).
+ * Only the exact commands Burrow's own VPN card would generate are
+ * recognized; anything else (a custom script, wg-quick, …) returns null.
+ */
+export function suggestVpnDisconnect(preConnect: string): string | null {
+  const pre = preConnect.trim();
+  const scutil = pre.match(/^scutil\s+--nc\s+start\s+(".*"|\S+)$/);
+  if (scutil) return `scutil --nc stop ${scutil[1]}`;
+  if (/^tailscale\s+up\b/.test(pre)) return "tailscale down";
+  return null;
 }
 
 export function emptyCommand(type: CommandType = "shell"): StoredCommand {
@@ -77,6 +95,7 @@ export function emptyCommand(type: CommandType = "shell"): StoredCommand {
     tmuxSession: null,
     transport: "auto",
     vpnPreConnect: null,
+    vpnPostDisconnect: null,
     homeNetworks: [],
   };
 }

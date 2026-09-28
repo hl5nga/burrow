@@ -49,6 +49,9 @@ interface Tab {
   connection?: ConnectionControl;
   /** The side-channel event stream of a Mosh tab. */
   eventStream?: Promise<number | undefined>;
+  /** This tab's profile's vpnPostDisconnect, only set if the VPN step
+   * actually ran for THIS connection (never for a home-network connect). */
+  vpnDisconnectCmd?: string;
 }
 
 /** What tab-level observers (the agent monitor) get to see of a tab. */
@@ -150,6 +153,7 @@ export class TabManager {
     withHooks: boolean,
     transport: SessionTransport,
     moshServer: string | null = null,
+    vpnDisconnect: string | null = null,
   ) {
     // Mosh drops the hooks' OSC events; they come over a side channel instead.
     const eventLog = transport === "mosh" && withHooks ? crypto.randomUUID() : null;
@@ -157,6 +161,7 @@ export class TabManager {
       label,
       connection: { profileId, transport },
       eventLog,
+      vpnDisconnect,
       options: {
         remote: true,
         spawn: (cols, rows, onOutput) =>
@@ -315,6 +320,8 @@ export class TabManager {
       connection?: Pick<Connection, "profileId" | "transport">;
       /** Session id of a Mosh tab's event log on the host. */
       eventLog?: string | null;
+      /** This connection's vpnPostDisconnect, if the VPN was actually engaged for it. */
+      vpnDisconnect?: string | null;
     } = {},
   ) {
     const id = this.nextId++;
@@ -344,6 +351,7 @@ export class TabManager {
       label,
       element,
       title: spec.label,
+      vpnDisconnectCmd: spec.vpnDisconnect ?? undefined,
       connection: spec.connection && {
         ...spec.connection,
         state: "connecting",
@@ -433,12 +441,44 @@ export class TabManager {
     tab.session?.dispose();
     tab.host.remove();
     tab.element.remove();
+    // No remaining tab still needs this VPN: this one was the last to use it.
+    if (
+      tab.vpnDisconnectCmd &&
+      !this.tabs.some((t) => t.vpnDisconnectCmd === tab.vpnDisconnectCmd)
+    ) {
+      void this.disconnectVpn(tab);
+    }
     if (this.tabs.length === 0) {
       this.active = undefined;
       this.events.onLastTabClosed();
       return;
     }
     if (tab === this.active) this.activate(this.tabs[Math.min(index, this.tabs.length - 1)]);
+  }
+
+  private async disconnectVpn(tab: Tab) {
+    const profileId = tab.connection?.profileId;
+    if (!profileId) return;
+    try {
+      await invoke("vpn_post_disconnect", { profileId });
+      showToast(`VPN 연결을 해제했습니다: ${tab.vpnDisconnectCmd}`);
+    } catch (err) {
+      showToast(`VPN을 해제하지 못했습니다: ${err}`);
+    }
+  }
+
+  /**
+   * The whole app is about to close (native window close, ⌘Q, Dock Quit —
+   * paths that don't go through remove()'s own per-tab check): disconnect
+   * every VPN currently engaged by an open tab, once each.
+   */
+  async disconnectAllVpns() {
+    const seen = new Set<string>();
+    for (const tab of this.tabs) {
+      if (!tab.vpnDisconnectCmd || seen.has(tab.vpnDisconnectCmd)) continue;
+      seen.add(tab.vpnDisconnectCmd);
+      await this.disconnectVpn(tab);
+    }
   }
 
   select(index: number) {
