@@ -19,6 +19,9 @@ pub struct Pane {
     pub session: String,
     pub window: u32,
     pub index: u32,
+    /// The tmux window's name (`#{window_name}` — user-set via
+    /// `tmux rename-window`, or defaulted to the running command).
+    pub window_name: String,
     /// What runs in the pane now, e.g. "claude", "node", "zsh".
     pub command: String,
     /// The active pane of the session's active window.
@@ -57,7 +60,9 @@ fn parse(out: &str) -> TmuxPanes {
             else {
                 continue;
             };
-            let Some((command, session)) = tail.split_once("::burrow::") else {
+            let mut t = tail.splitn(3, "::burrow::");
+            let (Some(command), Some(window_name), Some(session)) = (t.next(), t.next(), t.next())
+            else {
                 continue;
             };
             panes.push(Pane {
@@ -65,6 +70,7 @@ fn parse(out: &str) -> TmuxPanes {
                 session: session.into(),
                 window: window.parse().unwrap_or(0),
                 index: index.parse().unwrap_or(0),
+                window_name: window_name.into(),
                 command: command.into(),
                 active: pane_active == "1" && window_active == "1",
                 screen: String::new(),
@@ -127,13 +133,15 @@ mod tests {
 
     #[test]
     fn parses_panes_and_their_screens() {
-        let out = "Welcome\nburrow:pane %0 0 0 1 1 claude::burrow::my work\nburrow:pane %3 1 0 1 0 zsh::burrow::my work\n\
+        let out = "Welcome\nburrow:pane %0 0 0 1 1 claude::burrow::cpo::burrow::my work\nburrow:pane %3 1 0 1 0 zsh::burrow::be::burrow::my work\n\
                    burrow:capture %0\n|> fix it\n|  ? for shortcuts\n|\n|\nburrow:capture %3\n|$ ls\n";
         let TmuxPanes::Panes { panes } = parse(out) else {
             panic!("no panes")
         };
         assert_eq!(panes.len(), 2);
         assert_eq!(panes[0].command, "claude");
+        assert_eq!(panes[0].window_name, "cpo");
+        assert_eq!(panes[1].window_name, "be");
         assert_eq!(panes[0].session, "my work");
         assert!(panes[0].active);
         assert!(!panes[1].active, "active pane of an inactive window");

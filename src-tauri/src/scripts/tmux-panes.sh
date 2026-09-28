@@ -5,8 +5,9 @@ T=$(command -v tmux 2>/dev/null)
 [ -n "$T" ] || for d in /opt/homebrew/bin /usr/local/bin; do [ -x "$d/tmux" ] && T=$d/tmux && break; done
 [ -n "$T" ] || { echo burrow:no-tmux; exit 0; }
 # tmux turns tabs in -F output into "_", so: fixed space-separated fields, then
-# the command and the session name (either may contain spaces) around a marker.
-panes=$("$T" list-panes -a -F 'burrow:pane #{pane_id} #{window_index} #{pane_index} #{pane_active} #{window_active} #{pane_current_command}::burrow::#{session_name}' 2>/dev/null) || { echo burrow:no-server; exit 0; }
+# the command, window name and session name (any may contain spaces) joined
+# by a marker that's most unlikely to appear in a name someone actually picked.
+panes=$("$T" list-panes -a -F 'burrow:pane #{pane_id} #{window_index} #{pane_index} #{pane_active} #{window_active} #{pane_current_command}::burrow::#{window_name}::burrow::#{session_name}' 2>/dev/null) || { echo burrow:no-server; exit 0; }
 printf '%s\n' "$panes"
 printf '%s\n' "$panes" | cut -d' ' -f2 | while read -r id; do
   echo "burrow:capture $id"

@@ -53,6 +53,7 @@ app.innerHTML = `
     <div class="seg cwd"></div>
     <div class="seg branch" hidden><span class="ico">⎇</span> <span class="branch-name"></span></div>
     <div class="seg transport" hidden></div>
+    <button type="button" class="seg agents-status" hidden title="에이전트 대시보드 (⌘⇧A)"></button>
   </footer>
 `;
 
@@ -64,6 +65,7 @@ const status = {
   branch: app.querySelector<HTMLElement>(".statusbar .branch")!,
   branchName: app.querySelector<HTMLElement>(".statusbar .branch-name")!,
   transport: app.querySelector<HTMLElement>(".statusbar .transport")!,
+  agentsStatus: app.querySelector<HTMLButtonElement>(".statusbar .agents-status")!,
 };
 
 const CONNECTION_STATE: Record<Connection["state"], string> = {
@@ -103,6 +105,7 @@ const tabs = new TabManager(
       files.follow();
       resources.activeChanged();
       void frequent.refresh();
+      updateAgentStatusBar();
     },
     onHookEvent: (event) => {
       // stats_record went out on "exec"; by the next prompt the counts include it.
@@ -111,12 +114,42 @@ const tabs = new TabManager(
     onActiveConnection: (connection) => {
       showConnection(connection);
       resources.activeChanged();
+      updateAgentStatusBar();
     },
     confirmCloseLastTab: confirmCloseWindow,
     onLastTabClosed: () => getCurrentWindow().close(),
   },
 );
 const activeSession = () => tabs.activeSession();
+
+const AGENT_DOT: Record<import("./terminal/agent-status").AgentState, string> = {
+  unknown: "●",
+  working: "●",
+  waiting: "●",
+  done: "●",
+  error: "●",
+};
+/**
+ * A persistent, always-visible summary in the status bar: each agent Burrow
+ * currently tracks for the active tab (every tmux pane if it's an SSH+tmux
+ * connection, or the tab's own single agent otherwise), name + colored dot.
+ * Clicking it opens the same detail view as ⌘⇧A.
+ */
+function updateAgentStatusBar() {
+  const items = agents.summaryForActiveTab();
+  status.agentsStatus.hidden = items.length === 0;
+  status.agentsStatus.replaceChildren(
+    ...items.map(({ label, state }) => {
+      const chip = document.createElement("span");
+      chip.className = `agent-chip ${state}`;
+      chip.append(document.createElement("span"), document.createTextNode(label));
+      chip.firstElementChild!.className = "agent-chip-dot";
+      chip.firstElementChild!.textContent = AGENT_DOT[state];
+      return chip;
+    }),
+  );
+}
+status.agentsStatus.addEventListener("click", () => agents.toggle());
 // Dev builds: lets scripts/devctl read terminal state (e.g. `devctl screen`).
 const devBag: Record<string, unknown> = { tabs };
 if (import.meta.env.DEV) Object.assign(window, { __burrow: devBag });
@@ -146,7 +179,7 @@ const files = new FileBrowser(app.querySelector<HTMLElement>(".workspace")!, () 
   target: tabs.activeTarget(),
   session: activeSession(),
 }));
-const agents = new AgentMonitor(() => tabs.sshTabs());
+const agents = new AgentMonitor(() => tabs.sshTabs(), updateAgentStatusBar);
 tabs.observe(agents);
 tabs.observe(new GuardrailPrompt());
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);

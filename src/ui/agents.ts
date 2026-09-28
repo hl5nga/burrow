@@ -29,9 +29,15 @@ interface Pane {
   session: string;
   window: number;
   index: number;
+  /** tmux's window name (renamed by the user, or defaulted to the command) — what shows in tmux's own status line. */
+  windowName: string;
   command: string;
   active: boolean;
   screen: string;
+}
+
+function paneLabel(pane: Pane): string {
+  return pane.windowName || `pane ${pane.window}.${pane.index}`;
 }
 
 /** Tier 2: an agent in a pane of a remote tmux server. */
@@ -85,7 +91,12 @@ export class AgentMonitor implements TabObserver {
   private tick = 0;
   private pollTimer = 0;
 
-  constructor(private readonly sshTabs: () => { profileId: string; tab: TabRef }[]) {
+  constructor(
+    private readonly sshTabs: () => { profileId: string; tab: TabRef }[],
+    /** Fires after every Tier 1/2 update, whether or not the dashboard is open —
+     * lets a status-bar summary stay live without polling this class itself. */
+    private readonly onUpdate: () => void = () => {},
+  ) {
     this.overlay.className = "agents-overlay";
     this.overlay.hidden = true;
     const box = document.createElement("div");
@@ -299,7 +310,7 @@ export class AgentMonitor implements TabObserver {
         since: changed ? Date.now() : old.since,
       });
       if (changed && state === "waiting") {
-        const where = `${tabs[0]?.label() ?? ""} › ${pane.session} › pane ${pane.window}.${pane.index}`;
+        const where = `${tabs[0]?.label() ?? ""} › ${pane.session} › ${paneLabel(pane)}`;
         void this.notify(this.classifier.label(tool), where);
       }
     }
@@ -349,6 +360,29 @@ export class AgentMonitor implements TabObserver {
       const tool = this.classifier.label(states.find((s) => s.state === top)!.tool);
       tab.setBadge(top, `${tool} · ${STATE_TEXT[top]}${count > 1 ? ` (${count}개)` : ""}`);
     }
+    this.onUpdate();
+  }
+
+  /**
+   * For a persistent status-bar summary (not the ⌘⇧A modal): the active tab's
+   * tmux panes if it's an SSH+tmux connection with agents in them, else its own
+   * single Tier 1 agent if it has one, else empty (nothing to show).
+   */
+  summaryForActiveTab(): { label: string; state: AgentState }[] {
+    const ssh = this.sshTabs().find((t) => t.tab.isActive());
+    if (ssh) {
+      const panes = [...this.panes.values()]
+        .filter((p) => p.profileId === ssh.profileId)
+        .sort(
+          (x, y) =>
+            x.pane.session.localeCompare(y.pane.session) ||
+            x.pane.window - y.pane.window ||
+            x.pane.index - y.pane.index,
+        );
+      if (panes.length) return panes.map((p) => ({ label: paneLabel(p.pane), state: p.state }));
+    }
+    const agent = [...this.agents.values()].find((a) => a.tab.isActive());
+    return agent ? [{ label: this.classifier.label(agent.tool), state: agent.state }] : [];
   }
 
   /** Only when the user can't already see it: another tab, or Burrow in the background. */
@@ -424,7 +458,7 @@ export class AgentMonitor implements TabObserver {
         head.textContent = ssh.find((t) => t.profileId === p.profileId)?.tab.label() ?? "원격";
         rows.push(head);
       }
-      const where = `${p.pane.session} › pane ${p.pane.window}.${p.pane.index}${p.pane.active ? " · 보이는 pane" : ""}`;
+      const where = `${p.pane.session} › ${paneLabel(p.pane)}${p.pane.active ? " · 보이는 pane" : ""}`;
       rows.push(
         this.row(
           p.state,

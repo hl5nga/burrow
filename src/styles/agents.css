@@ -181,3 +181,54 @@
 .agent-badge.unknown {
   background: var(--text-dim);
 }
+
+/* Status-bar summary (always visible, distinct from the tab badge and the
+   ⌘⇧A dashboard) */
+.statusbar .seg.agents-status {
+  all: unset;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  /* Its own auto margin (not just riding on .transport's) so it still lands
+     at the right edge when .transport is hidden (no SSH connection). */
+  margin-left: auto;
+  padding: 0 2px;
+  font-family: var(--ui);
+  font-size: 11px;
+  color: var(--text-mid);
+  cursor: default;
+}
+
+.statusbar .seg.agents-status:hover {
+  color: var(--text-hi);
+}
+
+.agent-chip {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.agent-chip-dot {
+  font-size: 8px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.agent-chip.working .agent-chip-dot {
+  color: var(--amber);
+  animation: agent-pulse 1.4s ease-in-out infinite;
+}
+
+.agent-chip.waiting .agent-chip-dot {
+  color: #ff6259;
+}
+
+.agent-chip.done .agent-chip-dot {
+  color: var(--success);
+}
+
+.agent-chip.error .agent-chip-dot {
+  color: #ff6259;
+}
