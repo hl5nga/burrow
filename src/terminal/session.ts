@@ -240,6 +240,16 @@ export async function openTerminalSession(
   }
 
   fit.fit();
+  // A freshly created tab's container can still be mid-layout the instant it's
+  // unhidden (tab-bar reflow, window not yet settled at launch) — one fit()
+  // right after open() can measure a narrower width than the real one, and
+  // that's what gets sent to the remote tmux client. Two animation frames
+  // give layout a chance to settle before the size that matters — the one
+  // sent to spawnProcess() — is taken.
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
+  fit.fit();
 
   const spawnProcess = () => {
     const output = new Channel<ArrayBuffer>();
