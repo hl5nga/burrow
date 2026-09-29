@@ -84,6 +84,10 @@ export class AgentMonitor implements TabObserver {
   private readonly agents = new Map<number, TabAgent>();
   /** Keyed by `${profileId} ${pane id}`. */
   private readonly panes = new Map<string, PaneAgent>();
+  /** Every pane of the profile's tmux session, agent or not — for the status
+   * bar summary, which shows plain (non-agent) panes too, unlike `panes`
+   * above (agent panes only, used for badges/notifications/the dashboard). */
+  private readonly allPanes = new Map<string, Pane[]>();
   /** One pending scan per tab: output keeps coming, the scan runs once per 300ms. */
   private readonly scans = new Map<number, number>();
   private readonly overlay = document.createElement("div");
@@ -268,12 +272,16 @@ export class AgentMonitor implements TabObserver {
               // so profiles for different projects on one host stay apart.
               result.panes.filter((p) => !session || p.session === session)
             : [];
+        this.allPanes.set(profileId, panes);
         this.updatePanes(profileId, panes, tabs);
       }),
     );
     // Profiles whose tabs are gone.
     for (const [key, agent] of this.panes) {
       if (!byProfile.has(agent.profileId)) this.panes.delete(key);
+    }
+    for (const profileId of this.allPanes.keys()) {
+      if (!byProfile.has(profileId)) this.allPanes.delete(profileId);
     }
     this.updateBadges();
     if (this.isOpen) this.render();
@@ -368,18 +376,20 @@ export class AgentMonitor implements TabObserver {
    * tmux panes if it's an SSH+tmux connection with agents in them, else its own
    * single Tier 1 agent if it has one, else empty (nothing to show).
    */
-  summaryForActiveTab(): { label: string; state: AgentState }[] {
+  summaryForActiveTab(): { label: string; state: AgentState | "none" }[] {
     const ssh = this.sshTabs().find((t) => t.tab.isActive());
     if (ssh) {
-      const panes = [...this.panes.values()]
-        .filter((p) => p.profileId === ssh.profileId)
+      const all = (this.allPanes.get(ssh.profileId) ?? [])
+        .slice()
         .sort(
-          (x, y) =>
-            x.pane.session.localeCompare(y.pane.session) ||
-            x.pane.window - y.pane.window ||
-            x.pane.index - y.pane.index,
+          (x, y) => x.session.localeCompare(y.session) || x.window - y.window || x.index - y.index,
         );
-      if (panes.length) return panes.map((p) => ({ label: paneLabel(p.pane), state: p.state }));
+      if (all.length) {
+        return all.map((pane) => {
+          const agent = this.panes.get(`${ssh.profileId} ${pane.id}`);
+          return { label: paneLabel(pane), state: agent?.state ?? "none" };
+        });
+      }
     }
     const agent = [...this.agents.values()].find((a) => a.tab.isActive());
     return agent ? [{ label: this.classifier.label(agent.tool), state: agent.state }] : [];

@@ -216,19 +216,30 @@
   color: var(--text-dim);
 }
 
+/* 그린: 에이전트가 지금 실행 중. */
 .agent-chip.working .agent-chip-dot {
-  color: var(--amber);
+  color: var(--success);
   animation: agent-pulse 1.4s ease-in-out infinite;
 }
 
-.agent-chip.waiting .agent-chip-dot {
-  color: #ff6259;
-}
-
+/* 오렌지: 유휴/대기 — 승인을 기다리거나(waiting), 작업을 마치고 셸로 돌아온(done) 상태. */
+.agent-chip.waiting .agent-chip-dot,
 .agent-chip.done .agent-chip-dot {
-  color: var(--success);
+  color: var(--amber);
 }
 
+/* 그레이: 이 pane엔 인식되는 AI 에이전트가 없음(일반 셸) — none. unknown은 에이전트가
+   있다고 감지는 됐지만 화면 패턴이 안 맞아 상태를 모르는 경우라 같은 톤으로 묶는다. */
+.agent-chip.none .agent-chip-dot,
+.agent-chip.unknown .agent-chip-dot {
+  color: var(--text-dim);
+}
+
+.agent-chip.none {
+  opacity: 0.6;
+}
+
+/* 에러는 오렌지·그레이와 구분되어야 눈에 띄므로 빨강을 유지한다. */
 .agent-chip.error .agent-chip-dot {
   color: #ff6259;
 }

@@ -134,13 +134,6 @@ const tabs = new TabManager(
 );
 const activeSession = () => tabs.activeSession();
 
-const AGENT_DOT: Record<import("./terminal/agent-status").AgentState, string> = {
-  unknown: "●",
-  working: "●",
-  waiting: "●",
-  done: "●",
-  error: "●",
-};
 /**
  * A persistent, always-visible summary in the status bar: each agent Burrow
  * currently tracks for the active tab (every tmux pane if it's an SSH+tmux
@@ -156,7 +149,7 @@ function updateAgentStatusBar() {
       chip.className = `agent-chip ${state}`;
       chip.append(document.createElement("span"), document.createTextNode(label));
       chip.firstElementChild!.className = "agent-chip-dot";
-      chip.firstElementChild!.textContent = AGENT_DOT[state];
+      chip.firstElementChild!.textContent = "●";
       return chip;
     }),
   );

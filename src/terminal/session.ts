@@ -239,16 +239,22 @@ export async function openTerminalSession(
     // WebGL unavailable: xterm falls back to its DOM renderer.
   }
 
-  fit.fit();
-  // A freshly created tab's container can still be mid-layout the instant it's
-  // unhidden (tab-bar reflow, window not yet settled at launch) — one fit()
-  // right after open() can measure a narrower width than the real one, and
-  // that's what gets sent to the remote tmux client. Two animation frames
-  // give layout a chance to settle before the size that matters — the one
-  // sent to spawnProcess() — is taken.
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
+  // A freshly created tab's container can still be mid-layout the instant
+  // it's unhidden (tab-bar reflow, a CSS transition, window not yet settled
+  // at launch) — fitting once right after open() can measure a narrower
+  // width than the real one, and that's what gets sent to the remote tmux
+  // client and baked into whatever it draws there (a box-drawing prompt
+  // wraps its border onto extra lines). A fixed number of frames guesses at
+  // how long that takes; instead, wait until the container's own measured
+  // size stops changing between frames (capped, so a container that's
+  // legitimately always mid-animation can't hang this forever).
+  let last = { w: -1, h: -1 };
+  for (let i = 0; i < 15; i++) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const rect = container.getBoundingClientRect();
+    if (rect.width === last.w && rect.height === last.h) break;
+    last = { w: rect.width, h: rect.height };
+  }
   fit.fit();
 
   const spawnProcess = () => {
