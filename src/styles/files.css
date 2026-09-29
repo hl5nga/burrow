@@ -79,7 +79,7 @@
 
 .file-row:hover {
   color: var(--text-hi);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-hi) 4%, transparent);
 }
 
 .file-row.dir {
@@ -224,7 +224,7 @@
   padding: 1px 5px;
   font-family: var(--mono);
   font-size: 12.5px;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text-hi) 6%, transparent);
   border-radius: 4px;
 }
 

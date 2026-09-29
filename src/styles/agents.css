@@ -78,7 +78,7 @@
 }
 
 .agent-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-hi) 3%, transparent);
 }
 
 .agent-state {

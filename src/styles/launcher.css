@@ -169,7 +169,7 @@
   width: 30px;
   height: 17px;
   margin: 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-hi) 8%, transparent);
   border: 1px solid var(--border);
   border-radius: 9px;
   cursor: default;
@@ -214,7 +214,7 @@
 
 .launcher-connect:disabled {
   color: var(--text-dim);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text-hi) 6%, transparent);
 }
 
 .launcher-hint {

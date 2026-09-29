@@ -113,7 +113,7 @@
 }
 
 .cmd-row:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--text-hi) 2%, transparent);
 }
 
 .cmd-row.sel {
@@ -460,7 +460,7 @@
   padding: 7px 4px;
   font-size: 12.5px;
   color: var(--text-mid);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-hi) 4%, transparent);
 }
 
 .keys-name {
