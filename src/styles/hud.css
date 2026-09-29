@@ -19,7 +19,7 @@
   font-size: 10.5px;
   font-weight: 600;
   color: var(--text-hi);
-  background: rgba(21, 23, 27, 0.85);
+  background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
@@ -56,7 +56,7 @@
   right: 0;
   width: 240px;
   padding: 10px 12px 11px;
-  background: rgba(21, 23, 27, 0.92);
+  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border);
