@@ -39,7 +39,7 @@
 }
 
 .rm-chip.vpn {
-  color: var(--text-dim);
+  color: var(--status-gray);
 }
 
 .rm-chip.vpn.connected {
@@ -47,7 +47,7 @@
 }
 
 .rm-chip.vpn.connected .rm-icon {
-  color: var(--success);
+  color: var(--status-green);
 }
 
 .res-hud {
@@ -94,13 +94,13 @@
 .vpn-dot {
   width: 6px;
   height: 6px;
-  background: var(--text-dim);
+  background: var(--status-gray);
   border-radius: 50%;
 }
 
 .vpn-row.on .vpn-dot {
-  background: var(--success);
-  box-shadow: 0 0 5px var(--success);
+  background: var(--status-green);
+  box-shadow: 0 0 5px var(--status-green);
 }
 
 .vpn-name {
@@ -140,15 +140,15 @@
 }
 
 .rm-chip.ok .rm-icon {
-  color: var(--success);
+  color: var(--status-green);
 }
 
 .rm-chip.warn .rm-icon {
-  color: var(--amber);
+  color: var(--status-orange);
 }
 
 .rm-chip.high .rm-icon {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .res-card {
@@ -169,11 +169,11 @@
 }
 
 .rh-val.warn {
-  color: var(--amber);
+  color: var(--status-orange);
 }
 
 .rh-val.high {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .rh-bar {
@@ -186,17 +186,17 @@
 
 .rh-fill {
   height: 100%;
-  background: var(--success);
+  background: var(--status-green);
   border-radius: 2px;
   transition: width 0.4s ease;
 }
 
 .rh-fill.warn {
-  background: var(--amber);
+  background: var(--status-orange);
 }
 
 .rh-fill.high {
-  background: #ff6259;
+  background: var(--status-red);
 }
 
 .rh-detail {
@@ -213,15 +213,15 @@
 }
 
 .res-dot.ok {
-  background: var(--success);
+  background: var(--status-green);
 }
 
 .res-dot.warn {
-  background: var(--amber);
+  background: var(--status-orange);
 }
 
 .res-dot.high {
-  background: #ff6259;
+  background: var(--status-red);
 }
 
 .vpn-row {
@@ -257,11 +257,11 @@
 }
 
 .rm-chip.net {
-  color: var(--success);
+  color: var(--status-green);
 }
 
 .rm-chip.net.offline {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .rm-chip.text-size {

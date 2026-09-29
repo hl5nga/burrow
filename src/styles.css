@@ -5,11 +5,28 @@
   --bg-elevated: #15171b;
   --border: #24282e;
   --amber: #ffb000;
+  /* For a solid button/chip fill that has dark text sitting on top of it
+     (`.btn`, `.launcher-connect`, `.fi-key`) — normally identical to
+     --amber, but mono's --amber is deliberately dark (it doubles as small
+     accent TEXT on a near-white panel there), which would make dark button
+     text unreadable if used as the fill too. Only mono overrides this. */
+  --amber-fill: var(--amber);
   --cyan: #4be3d0;
   --text-hi: #eeece6;
   --text-mid: #9aa0a6;
   --text-dim: #5b6167;
   --success: #54d68a;
+  /* Fixed, theme-independent status/signal colors. These must NEVER be
+     overridden inside a [data-theme=...] block: an agent's working/waiting/
+     done/error state, a connection's online/offline state, a resource
+     meter's ok/warn/high level, etc. are a learned visual language and must
+     read the same in every theme, including "mono" (which otherwise turns
+     --amber/--success grayscale). Values are taken from the dark theme's
+     former --success/--amber/#ff6259 so nothing shifts in the baseline look. */
+  --status-green: #54d68a;
+  --status-orange: #ffb000;
+  --status-gray: #8b9096;
+  --status-red: #ff6259;
   --mono: "JetBrains Mono", "Burrow Hangul", ui-monospace, monospace;
   /* Prose in panels and toasts; the monospace stack is only for terminal-like text. */
   --ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
@@ -76,6 +93,10 @@
   --bg-elevated: #ffffff;
   --border: #d4d4d4;
   --amber: #4a4a4a;
+  /* Light, not dark like --amber above: this is a button FILL with dark
+     text on top of it, so it needs the opposite luminance from the small
+     accent-text use of --amber. */
+  --amber-fill: #c6c6c6;
   --cyan: #4a4a4a;
   --text-hi: #141414;
   --text-mid: #5a5a5a;
@@ -166,7 +187,7 @@ body::after {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--text-dim);
+  background: var(--status-gray);
 }
 
 .tab.active {
@@ -178,18 +199,18 @@ body::after {
 }
 
 .tab.active .dot {
-  background: var(--success);
-  box-shadow: 0 0 6px var(--success);
+  background: var(--status-green);
+  box-shadow: 0 0 6px var(--status-green);
 }
 
 .tab .dot.reconnecting {
-  background: var(--amber);
-  box-shadow: 0 0 6px var(--amber);
+  background: var(--status-orange);
+  box-shadow: 0 0 6px var(--status-orange);
   animation: dot-pulse 1.2s ease-in-out infinite;
 }
 
 .tab .dot.offline {
-  background: #ff6259;
+  background: var(--status-red);
   box-shadow: none;
 }
 
@@ -271,14 +292,14 @@ body::after {
 
 .statusbar .seg.transport[data-state="reconnecting"],
 .statusbar .seg.transport[data-state="connecting"] {
-  color: var(--amber);
-  border-color: rgba(255, 176, 0, 0.35);
+  color: var(--status-orange);
+  border-color: color-mix(in srgb, var(--status-orange) 35%, transparent);
 }
 
 .statusbar .seg.transport[data-state="offline"],
 .statusbar .seg.transport[data-state="stopped"] {
-  color: #ff6259;
-  border-color: rgba(255, 98, 89, 0.35);
+  color: var(--status-red);
+  border-color: color-mix(in srgb, var(--status-red) 35%, transparent);
 }
 
 .statusbar .seg[hidden] {

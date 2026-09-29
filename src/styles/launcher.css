@@ -40,11 +40,11 @@
 .launcher-net {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--success);
+  color: var(--status-green);
 }
 
 .launcher-net.offline {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .launcher-sub {
@@ -121,16 +121,16 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--text-dim);
+  background: var(--status-gray);
 }
 
 .launcher-dot.online {
-  background: var(--success);
-  box-shadow: 0 0 6px var(--success);
+  background: var(--status-green);
+  box-shadow: 0 0 6px var(--status-green);
 }
 
 .launcher-dot.offline {
-  background: #ff6259;
+  background: var(--status-red);
 }
 
 .launcher-main {
@@ -214,7 +214,7 @@
   font-size: 12.5px;
   font-weight: 600;
   color: #0a0b0d;
-  background: var(--amber);
+  background: var(--amber-fill);
   border-radius: 7px;
   cursor: default;
 }

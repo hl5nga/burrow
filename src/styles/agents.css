@@ -89,30 +89,30 @@
   font-weight: 700;
   text-align: center;
   border-radius: 6px;
-  color: var(--text-dim);
+  color: var(--status-gray);
   border: 1px solid var(--border);
 }
 
 .agent-state.working {
-  color: var(--amber);
-  border-color: rgba(255, 176, 0, 0.35);
+  color: var(--status-orange);
+  border-color: color-mix(in srgb, var(--status-orange) 35%, transparent);
   animation: agent-pulse 1.4s ease-in-out infinite;
 }
 
 .agent-state.waiting {
   color: #0a0b0d;
-  background: #ff6259;
-  border-color: #ff6259;
+  background: var(--status-red);
+  border-color: var(--status-red);
 }
 
 .agent-state.done {
-  color: var(--success);
-  border-color: rgba(84, 214, 138, 0.35);
+  color: var(--status-green);
+  border-color: color-mix(in srgb, var(--status-green) 35%, transparent);
 }
 
 .agent-state.error {
-  color: #ff6259;
-  border-color: rgba(255, 98, 89, 0.45);
+  color: var(--status-red);
+  border-color: color-mix(in srgb, var(--status-red) 45%, transparent);
 }
 
 .agent-state.error::before {
@@ -161,25 +161,25 @@
 }
 
 .agent-badge.working {
-  background: var(--amber);
+  background: var(--status-orange);
   animation: agent-pulse 1.4s ease-in-out infinite;
 }
 
 .agent-badge.waiting {
-  background: #ff6259;
-  box-shadow: 0 0 6px #ff6259;
+  background: var(--status-red);
+  box-shadow: 0 0 6px var(--status-red);
 }
 
 .agent-badge.done {
-  background: var(--success);
+  background: var(--status-green);
 }
 
 .agent-badge.error {
-  background: #ff6259;
+  background: var(--status-red);
 }
 
 .agent-badge.unknown {
-  background: var(--text-dim);
+  background: var(--status-gray);
 }
 
 /* Status-bar summary (always visible, distinct from the tab badge and the
@@ -213,26 +213,26 @@
 .agent-chip-dot {
   font-size: 8px;
   line-height: 1;
-  color: var(--text-dim);
+  color: var(--status-gray);
 }
 
 /* 그린: 에이전트가 지금 실행 중. */
 .agent-chip.working .agent-chip-dot {
-  color: var(--success);
+  color: var(--status-green);
   animation: agent-pulse 1.4s ease-in-out infinite;
 }
 
 /* 오렌지: 유휴/대기 — 승인을 기다리거나(waiting), 작업을 마치고 셸로 돌아온(done) 상태. */
 .agent-chip.waiting .agent-chip-dot,
 .agent-chip.done .agent-chip-dot {
-  color: var(--amber);
+  color: var(--status-orange);
 }
 
 /* 그레이: 이 pane엔 인식되는 AI 에이전트가 없음(일반 셸) — none. unknown은 에이전트가
    있다고 감지는 됐지만 화면 패턴이 안 맞아 상태를 모르는 경우라 같은 톤으로 묶는다. */
 .agent-chip.none .agent-chip-dot,
 .agent-chip.unknown .agent-chip-dot {
-  color: var(--text-dim);
+  color: var(--status-gray);
 }
 
 .agent-chip.none {
@@ -241,5 +241,5 @@
 
 /* 에러는 오렌지·그레이와 구분되어야 눈에 띄므로 빨강을 유지한다. */
 .agent-chip.error .agent-chip-dot {
-  color: #ff6259;
+  color: var(--status-red);
 }

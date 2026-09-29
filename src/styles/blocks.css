@@ -16,18 +16,18 @@
 }
 
 .block-bar.ok::before {
-  background: var(--success);
+  background: var(--status-green);
   opacity: 0.55;
 }
 
 .block-bar.err::before {
-  background: #ff6259;
+  background: var(--status-red);
   opacity: 0.8;
 }
 
 .block-bar.active::before {
-  background: var(--amber);
-  box-shadow: 0 0 6px rgba(255, 176, 0, 0.35);
+  background: var(--status-orange);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--status-orange) 35%, transparent);
 }
 
 .block-meta-host {
@@ -54,11 +54,11 @@
 }
 
 .block-info .exit-ok {
-  color: var(--success);
+  color: var(--status-green);
 }
 
 .block-info .exit-err {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .block-actions {

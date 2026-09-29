@@ -80,7 +80,7 @@
   font-size: 12.5px;
   font-weight: 600;
   color: #0a0b0d;
-  background: var(--amber);
+  background: var(--amber-fill);
   border-radius: 8px;
   box-shadow: 0 0 24px -6px color-mix(in srgb, var(--amber) 35%, transparent);
   cursor: default;
@@ -95,9 +95,9 @@
 
 .btn.danger {
   margin-left: auto;
-  color: #ff6259;
+  color: var(--status-red);
   background: transparent;
-  border: 1px solid rgba(255, 98, 89, 0.35);
+  border: 1px solid color-mix(in srgb, var(--status-red) 35%, transparent);
   box-shadow: none;
 }
 
@@ -200,15 +200,15 @@
 }
 
 .h-status.online {
-  background: var(--success);
+  background: var(--status-green);
 }
 
 .h-status.offline {
-  background: #ff6259;
+  background: var(--status-red);
 }
 
 .h-status.unknown {
-  background: var(--text-dim);
+  background: var(--status-gray);
 }
 
 .cr-connect {
@@ -288,7 +288,7 @@
 }
 
 .field-error {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .type-toggle {
@@ -369,20 +369,20 @@
 }
 
 .type-badge.block {
-  color: #ff6259;
-  background: rgba(255, 98, 89, 0.08);
-  border: 1px solid rgba(255, 98, 89, 0.3);
+  color: var(--status-red);
+  background: color-mix(in srgb, var(--status-red) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-red) 30%, transparent);
 }
 
 .type-badge.warn {
-  color: var(--amber);
-  background: color-mix(in srgb, var(--amber) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--amber) 20%, transparent);
+  color: var(--status-orange);
+  background: color-mix(in srgb, var(--status-orange) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-orange) 20%, transparent);
 }
 
 .guard-row.hit {
-  border-color: rgba(255, 98, 89, 0.45);
-  background: rgba(255, 98, 89, 0.06);
+  border-color: color-mix(in srgb, var(--status-red) 45%, transparent);
+  background: color-mix(in srgb, var(--status-red) 6%, transparent);
 }
 
 .guard-row.off {
@@ -390,8 +390,8 @@
 }
 
 .cr-tag.bad {
-  color: #ff6259;
-  border-color: rgba(255, 98, 89, 0.4);
+  color: var(--status-red);
+  border-color: color-mix(in srgb, var(--status-red) 40%, transparent);
 }
 
 .guard-claude {
@@ -415,9 +415,9 @@
 }
 
 .btn.danger {
-  color: #ff6259;
+  color: var(--status-red);
   background: transparent;
-  border: 1px solid rgba(255, 98, 89, 0.35);
+  border: 1px solid color-mix(in srgb, var(--status-red) 35%, transparent);
   box-shadow: none;
 }
 
@@ -508,7 +508,7 @@
   gap: 8px;
   align-items: center;
   font-size: 11.5px;
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .keys-extras {
@@ -547,7 +547,7 @@
 }
 
 .home-net-x:hover {
-  color: #ff6259;
+  color: var(--status-red);
 }
 
 .about {
