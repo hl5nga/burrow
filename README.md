@@ -57,6 +57,11 @@ safety net for commands that are hard to undo.
   vim.
 - Full CJK (Korean/Japanese/Chinese) input support, including Korean IME
   composition inside a WKWebView, where it usually breaks.
+- **Korean and English UI** — follows the OS locale on first launch (Korean
+  if the system is set to Korean, English otherwise), with a language chip
+  in the corner to override it any time; the choice is remembered locally.
+  Migration to `en` is in progress module by module — see
+  [docs/1_progress/T29_i18n-implementation.md](docs/1_progress/T29_i18n-implementation.md).
 
 ## Status
 

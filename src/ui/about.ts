@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import appIcon from "../assets/icon.png";
+import { t } from "../i18n";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) {
   const node = document.createElement(tag);
@@ -22,7 +23,7 @@ export async function showAbout() {
   icon.src = appIcon;
   icon.alt = "";
   const heading = el("div", "about-heading");
-  heading.append(el("div", "about-title", "Burrow"));
+  heading.append(el("div", "about-title", t("about.title")));
   let version = "";
   try {
     version = await getVersion();
@@ -31,15 +32,9 @@ export async function showAbout() {
   }
   if (version) heading.append(el("div", "about-version", `v${version}`));
   box.append(icon, heading);
-  box.append(
-    el(
-      "p",
-      "about-tagline",
-      "집 개발 머신에 SSH로 붙어 AI 에이전트와 함께 일하는 개발자를 위한 터미널.",
-    ),
-  );
-  box.append(el("div", "about-stack", "Tauri · Rust · xterm.js"));
-  const close = el("button", "btn ghost", "닫기");
+  box.append(el("p", "about-tagline", t("about.tagline")));
+  box.append(el("div", "about-stack", t("about.stack")));
+  const close = el("button", "btn ghost", t("about.close"));
   close.type = "button";
   const actions = el("div", "about-actions");
   actions.append(close);

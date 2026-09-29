@@ -11,6 +11,7 @@ import {
 } from "./command-validation";
 import { showToast } from "./toast";
 import { checkReachable } from "./reachability";
+import { t, onLocaleChange } from "../i18n";
 
 interface CommandsFile {
   version: number;
@@ -45,43 +46,63 @@ interface FieldSpec {
   mono?: boolean;
 }
 
-const FIELDS: FieldSpec[] = [
-  { key: "name", label: "이름", for: "both", placeholder: "예: 배포, 집 노트북" },
-  { key: "command", label: "명령", for: "shell", placeholder: "예: npm run deploy", mono: true },
-  {
-    key: "sshHost",
-    label: "SSH 호스트",
-    for: "ssh-profile",
-    placeholder: "예: user@home-laptop.tailnet.ts.net",
-    hint: "원격 노트북이 잠들면 접속할 수 없습니다. 그쪽에서 시스템 설정 › 배터리 › 옵션의 '네트워크 접근 시 깨우기'를 켜거나 caffeinate -s를 실행해 두세요",
-    mono: true,
-  },
-  {
-    key: "tmuxSession",
-    label: "tmux 세션",
-    for: "ssh-profile",
-    placeholder: "비워 두면 tmux 없이 접속",
-    hint: "접속하면 이 이름의 tmux 세션에 자동으로 다시 붙습니다",
-    mono: true,
-  },
-  {
-    key: "vpnPreConnect",
-    label: "접속 전 VPN 명령",
-    for: "ssh-profile",
-    placeholder: '예: scutil --nc start "회사 VPN"',
-    hint: '적어 둔 경우에만, 호스트에 닿지 않을 때 이 Mac에서 실행합니다. 예: tailscale up · scutil --nc start "회사 VPN" · wg-quick up home (sudo가 필요한 명령은 안 됩니다)',
-    mono: true,
-  },
-  {
-    key: "vpnPostDisconnect",
-    label: "연결 종료 시 VPN 끄기 명령",
-    for: "ssh-profile",
-    placeholder: '예: scutil --nc stop "회사 VPN"',
-    hint: "비워 두면 Burrow가 VPN을 스스로 끄지 않습니다. 채워두면, 이 VPN을 쓰는 탭이 하나도 안 남았을 때(탭을 닫거나 Burrow를 종료할 때) 자동으로 실행합니다.",
-    mono: true,
-  },
-  { key: "description", label: "설명", for: "both", multiline: true },
-];
+/** Built fresh on every render (instead of a static constant) so it always
+ * reflects the current locale — see onLocaleChange in CommandManager. */
+function buildFields(): FieldSpec[] {
+  return [
+    {
+      key: "name",
+      label: t("commandManager.fields.name.label"),
+      for: "both",
+      placeholder: t("commandManager.fields.name.placeholder"),
+    },
+    {
+      key: "command",
+      label: t("commandManager.fields.command.label"),
+      for: "shell",
+      placeholder: t("commandManager.fields.command.placeholder"),
+      mono: true,
+    },
+    {
+      key: "sshHost",
+      label: t("commandManager.fields.sshHost.label"),
+      for: "ssh-profile",
+      placeholder: t("commandManager.fields.sshHost.placeholder"),
+      hint: t("commandManager.fields.sshHost.hint"),
+      mono: true,
+    },
+    {
+      key: "tmuxSession",
+      label: t("commandManager.fields.tmuxSession.label"),
+      for: "ssh-profile",
+      placeholder: t("commandManager.fields.tmuxSession.placeholder"),
+      hint: t("commandManager.fields.tmuxSession.hint"),
+      mono: true,
+    },
+    {
+      key: "vpnPreConnect",
+      label: t("commandManager.fields.vpnPreConnect.label"),
+      for: "ssh-profile",
+      placeholder: t("commandManager.fields.vpnPreConnect.placeholder"),
+      hint: t("commandManager.fields.vpnPreConnect.hint"),
+      mono: true,
+    },
+    {
+      key: "vpnPostDisconnect",
+      label: t("commandManager.fields.vpnPostDisconnect.label"),
+      for: "ssh-profile",
+      placeholder: t("commandManager.fields.vpnPostDisconnect.placeholder"),
+      hint: t("commandManager.fields.vpnPostDisconnect.hint"),
+      mono: true,
+    },
+    {
+      key: "description",
+      label: t("commandManager.fields.description.label"),
+      for: "both",
+      multiline: true,
+    },
+  ];
+}
 
 /** Registering, editing and deleting commands and SSH profiles (⌘,). */
 export class CommandManager {
@@ -97,6 +118,10 @@ export class CommandManager {
   private readonly list = el("div", "mgmt-rows");
   private readonly count = el("span", "mgmt-count");
   private readonly form = el("form", "mgmt-form");
+  private readonly listTitleText = el("span");
+  private readonly addButton = el("button", "btn");
+  private readonly guardButton = el("button", "btn ghost");
+  private readonly keysButton = el("button", "btn ghost");
   private commands: StoredCommand[] = [];
   private draft: StoredCommand = emptyCommand();
   private errors: FieldErrors = {};
@@ -111,26 +136,22 @@ export class CommandManager {
     const box = el("div", "manager");
     const listPane = el("div", "mgmt-list");
     const head = el("div", "mgmt-list-head");
-    const title = el("h3", undefined, "등록된 명령어");
-    title.append(this.count);
-    const add = el("button", "btn", "＋ 새로 등록");
-    add.type = "button";
-    add.addEventListener("click", () => this.edit(emptyCommand()));
-    const guard = el("button", "btn ghost", "가드레일");
-    guard.type = "button";
-    guard.title = "위험 명령어 가드레일 규칙";
-    guard.addEventListener("click", () => {
+    const title = el("h3");
+    title.append(this.listTitleText, this.count);
+    this.addButton.type = "button";
+    this.addButton.addEventListener("click", () => this.edit(emptyCommand()));
+    this.guardButton.type = "button";
+    this.guardButton.addEventListener("click", () => {
       this.overlay.hidden = true;
       this.openGuardrails();
     });
-    const keysButton = el("button", "btn ghost", "단축키");
-    keysButton.type = "button";
-    keysButton.addEventListener("click", () => {
+    this.keysButton.type = "button";
+    this.keysButton.addEventListener("click", () => {
       this.overlay.hidden = true;
       this.openKeybindings();
     });
     const actions = el("div", "mgmt-head-actions");
-    actions.append(keysButton, guard, add);
+    actions.append(this.keysButton, this.guardButton, this.addButton);
     head.append(title, actions);
     listPane.append(head, this.list);
 
@@ -152,6 +173,22 @@ export class CommandManager {
       e.preventDefault();
       void this.save();
     });
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as the other app-lifetime
+    // managers.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.listTitleText.textContent = t("commandManager.listTitle");
+    this.addButton.textContent = t("commandManager.addNew");
+    this.guardButton.textContent = t("commandManager.guardrails");
+    this.guardButton.title = t("commandManager.guardrailsTitle");
+    this.keysButton.textContent = t("commandManager.keybindings");
+    this.renderList();
+    this.renderForm();
   }
 
   get isOpen(): boolean {
@@ -206,13 +243,7 @@ export class CommandManager {
     this.count.textContent = ` · ${this.commands.length}`;
     this.list.replaceChildren();
     if (this.commands.length === 0) {
-      this.list.append(
-        el(
-          "div",
-          "mgmt-empty",
-          "아직 등록한 명령어가 없습니다. 오른쪽에서 첫 명령을 만들어 보세요.",
-        ),
-      );
+      this.list.append(el("div", "mgmt-empty", t("commandManager.emptyList")));
     }
     for (const c of this.commands) {
       const ssh = c.type === "ssh-profile";
@@ -222,25 +253,26 @@ export class CommandManager {
 
       const main = el("div", "cr-main");
       const name = el("div", "cr-name", c.name || c.command);
-      if (ssh && c.tmuxSession) name.append(el("span", "cr-tag", `tmux · ${c.tmuxSession}`));
+      if (ssh && c.tmuxSession)
+        name.append(el("span", "cr-tag", t("commandManager.tmuxTag", { session: c.tmuxSession })));
       main.append(name, el("div", "cr-sub", ssh ? (c.sshHost ?? "") : c.command));
 
       if (ssh) {
         const avatar = el("div", "host-avatar", initials(c));
         const dot = el("span", "h-status unknown");
-        dot.title = "확인 중…";
+        dot.title = t("commandManager.checking");
         avatar.append(dot);
         void checkReachable(c.id).then((r) => {
           dot.className = `h-status ${r.state}`;
           dot.title =
             r.state === "online"
-              ? "온라인"
+              ? t("commandManager.online")
               : r.state === "offline"
-                ? `오프라인 · ${r.reason}`
-                : "프록시 경유라 미리 확인할 수 없습니다";
+                ? t("commandManager.offline", { reason: r.reason })
+                : t("commandManager.proxyUnknown");
         });
-        const connect = el("span", "cr-connect", "접속");
-        connect.title = `${c.sshHost}에 접속`;
+        const connect = el("span", "cr-connect", t("commandManager.connect"));
+        connect.title = t("commandManager.connectTitle", { host: c.sshHost ?? "" });
         connect.addEventListener("click", (e) => {
           e.stopPropagation();
           // connect() first: callers that check "did a connection start?" from
@@ -263,22 +295,26 @@ export class CommandManager {
     const isNew = !d.id;
     this.form.replaceChildren();
     this.form.append(
-      el("h3", undefined, isNew ? "새 명령어 등록" : d.name || d.command || "명령어"),
+      el(
+        "h3",
+        undefined,
+        isNew ? t("commandManager.newTitle") : d.name || d.command || t("commandManager.untitled"),
+      ),
       el(
         "p",
         "hint",
         d.type === "ssh-profile"
-          ? "SSH 프로필 — 접속하면 원격 zsh 훅이 적용되고, 원격에서 쓴 명령도 따로 집계됩니다."
-          : "쉘 명령 — ⌘K 팔레트와 자주 쓰는 명령어 패널에서 바로 실행됩니다.",
+          ? t("commandManager.sshProfileHint")
+          : t("commandManager.shellHint"),
       ),
     );
 
     const typeField = el("div", "field");
-    typeField.append(el("label", undefined, "타입"));
+    typeField.append(el("label", undefined, t("commandManager.type")));
     const toggle = el("div", "type-toggle");
     for (const [type, label] of [
-      ["shell", "쉘 명령어"],
-      ["ssh-profile", "SSH 프로필"],
+      ["shell", t("commandManager.typeShell")],
+      ["ssh-profile", t("commandManager.typeSshProfile")],
     ] as [CommandType, string][]) {
       const opt = el("button", d.type === type ? "opt active" : "opt", label);
       opt.type = "button";
@@ -292,7 +328,7 @@ export class CommandManager {
     typeField.append(toggle);
     this.form.append(typeField);
 
-    for (const spec of FIELDS) {
+    for (const spec of buildFields()) {
       if (spec.for !== "both" && spec.for !== d.type) continue;
       const field = el("div", "field");
       const id = `mgmt-${spec.key}`;
@@ -315,7 +351,7 @@ export class CommandManager {
       if (spec.key === "sshHost") this.form.append(this.transportField());
       if (spec.key === "vpnPreConnect") this.form.append(this.homeNetworksField());
       if (spec.key === "vpnPostDisconnect") {
-        const suggest = el("button", "btn ghost vpn-suggest", "접속 명령에서 자동으로 채우기");
+        const suggest = el("button", "btn ghost vpn-suggest", t("commandManager.vpnAutofill"));
         suggest.type = "button";
         suggest.addEventListener("click", () => {
           const guess = suggestVpnDisconnect(this.draft.vpnPreConnect ?? "");
@@ -323,7 +359,7 @@ export class CommandManager {
             this.draft.vpnPostDisconnect = guess;
             this.renderForm();
           } else {
-            showToast("이 접속 명령에서는 자동으로 반대 명령을 못 만듭니다 — 직접 입력해 주세요");
+            showToast(t("commandManager.vpnAutofillFailed"));
           }
         });
         field.append(suggest);
@@ -331,14 +367,22 @@ export class CommandManager {
     }
 
     const actions = el("div", "form-actions");
-    const save = el("button", "btn", isNew ? "등록" : "저장");
+    const save = el(
+      "button",
+      "btn",
+      isNew ? t("commandManager.register") : t("commandManager.save"),
+    );
     save.type = "submit";
-    const cancel = el("button", "btn ghost", "닫기");
+    const cancel = el("button", "btn ghost", t("commandManager.close"));
     cancel.type = "button";
     cancel.addEventListener("click", () => this.close());
     actions.append(save, cancel);
     if (!isNew) {
-      const del = el("button", "btn danger", this.deleteArmed ? "정말 삭제" : "삭제");
+      const del = el(
+        "button",
+        "btn danger",
+        this.deleteArmed ? t("commandManager.deleteConfirm") : t("commandManager.delete"),
+      );
       del.type = "button";
       del.addEventListener("click", () => void this.remove());
       actions.append(del);
@@ -349,15 +393,15 @@ export class CommandManager {
   /** Networks where the VPN step is skipped; others always run it first. */
   private homeNetworksField(): HTMLElement {
     const field = el("div", "field");
-    field.append(el("label", undefined, "집 네트워크 (VPN 건너뜀)"));
+    field.append(el("label", undefined, t("commandManager.homeNetworks.label")));
     const list = el("div", "home-nets");
     const nets = this.draft.homeNetworks ?? [];
     for (const net of nets) {
       const chip = el("span", "home-net", net.name);
-      chip.title = `공유기 ${net.gatewayMac}`;
+      chip.title = t("commandManager.homeNetworks.gateway", { mac: net.gatewayMac });
       const remove = el("button", "home-net-x", "×");
       remove.type = "button";
-      remove.title = "삭제";
+      remove.title = t("commandManager.homeNetworks.remove");
       remove.addEventListener("click", () => {
         this.draft.homeNetworks = nets.filter((n) => n.gatewayMac !== net.gatewayMac);
         this.renderForm();
@@ -365,19 +409,21 @@ export class CommandManager {
       chip.append(remove);
       list.append(chip);
     }
-    const add = el("button", "btn ghost", "＋ 지금 이 네트워크를 집으로");
+    const add = el("button", "btn ghost", t("commandManager.homeNetworks.add"));
     add.type = "button";
     add.addEventListener("click", async () => {
       const fp = await invoke<{ gateway: string; gatewayMac: string } | null>(
         "network_fingerprint",
       );
-      if (!fp)
-        return showToast("지금 네트워크의 공유기를 알 수 없습니다 (오프라인이거나 VPN 경로)");
+      if (!fp) return showToast(t("commandManager.homeNetworks.unknownNetwork"));
       if (nets.some((n) => n.gatewayMac === fp.gatewayMac))
-        return showToast("이미 등록된 네트워크입니다");
+        return showToast(t("commandManager.homeNetworks.alreadyAdded"));
       this.draft.homeNetworks = [
         ...nets,
-        { gatewayMac: fp.gatewayMac, name: `집 (${fp.gateway})` },
+        {
+          gatewayMac: fp.gatewayMac,
+          name: t("commandManager.homeNetworks.homeName", { gateway: fp.gateway }),
+        },
       ];
       this.renderForm();
     });
@@ -388,8 +434,8 @@ export class CommandManager {
         "div",
         "field-hint",
         nets.length
-          ? "이 네트워크에서는 VPN 없이 바로 접속하고, 다른 네트워크에서는 접속 전에 항상 VPN 명령을 실행합니다. (공유기 주소로 알아봅니다 — macOS는 Wi-Fi 이름을 앱에 알려 주지 않습니다)"
-          : "등록하지 않으면 호스트에 닿지 않을 때만 VPN 명령을 실행합니다. 밖의 네트워크가 우연히 같은 주소 대역(예: 192.168.1.x)이면 잘못 판단할 수 있어, 집에서 한 번 등록해 두는 것을 권장합니다.",
+          ? t("commandManager.homeNetworks.hintWithNetworks")
+          : t("commandManager.homeNetworks.hintEmpty"),
       ),
     );
     return field;
@@ -397,14 +443,14 @@ export class CommandManager {
 
   private transportField(): HTMLElement {
     const field = el("div", "field");
-    const label = el("label", undefined, "전송 방식");
+    const label = el("label", undefined, t("commandManager.transport.label"));
     label.htmlFor = "mgmt-transport";
     const select = el("select", "input");
     select.id = "mgmt-transport";
     for (const [value, text] of [
-      ["auto", "자동 (원격에 mosh-server가 있으면 Mosh)"],
-      ["ssh", "SSH"],
-      ["mosh", "Mosh"],
+      ["auto", t("commandManager.transport.auto")],
+      ["ssh", t("commandManager.transport.ssh")],
+      ["mosh", t("commandManager.transport.mosh")],
     ] as [Transport, string][]) {
       const option = el("option", undefined, text);
       option.value = value;
@@ -414,15 +460,7 @@ export class CommandManager {
     select.addEventListener("change", () => {
       this.draft.transport = select.value as Transport;
     });
-    field.append(
-      label,
-      select,
-      el(
-        "div",
-        "field-hint",
-        "Mosh는 Wi-Fi가 바뀌거나 잠깐 끊겨도 세션이 유지됩니다. 이 Mac에도 mosh가 있어야 합니다 (brew install mosh)",
-      ),
-    );
+    field.append(label, select, el("div", "field-hint", t("commandManager.transport.hint")));
     return field;
   }
 
@@ -442,12 +480,12 @@ export class CommandManager {
     try {
       await this.persist();
     } catch (err) {
-      showToast(`저장하지 못했습니다: ${err}`);
+      showToast(t("commandManager.saveFailed", { error: String(err) }));
       await this.load();
       return;
     }
     this.edit(normalized);
-    showToast(`'${normalized.name || normalized.command}' 저장됨`, 2500);
+    showToast(t("commandManager.saved", { name: normalized.name || normalized.command }), 2500);
   }
 
   private async remove() {
@@ -466,6 +504,6 @@ export class CommandManager {
     this.commands = this.commands.filter((c) => c.id !== removed.id);
     await this.persist();
     this.edit(this.commands[0] ?? emptyCommand());
-    showToast(`'${removed.name || removed.command}' 삭제됨`, 2500);
+    showToast(t("commandManager.deleted", { name: removed.name || removed.command }), 2500);
   }
 }
