@@ -3,6 +3,7 @@ name = "burrow"
 version = "0.1.0"
 description = "Burrow — terminal for remote AI-assisted development"
 authors = ["felixjung"]
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -97,4 +97,12 @@ docs/            Design notes, UI mockups, and the task log
 
 ## License
 
-Not yet chosen.
+[GPL-3.0-or-later](LICENSE). If you distribute a modified build, its source
+must be shared too, under the same license — the goal is that improvements
+made to Burrow flow back to everyone using it, not just the person who made
+them.
+
+All dependencies (Rust crates and npm packages, scanned via `cargo metadata`
+and `license-checker`) are MIT/Apache-2.0/BSD/MPL-2.0 or similarly permissive
+and compatible with GPL-3.0; none introduce a conflicting license
+obligation.
