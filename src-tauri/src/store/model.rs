@@ -140,10 +140,20 @@ pub struct ConfigFile {
     /// here, so a new theme never needs a Rust change.
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// UI language ("ko" or "en"). The frontend (src/i18n/index.ts) detects
+    /// the OS/browser locale and writes it here the first time it ever
+    /// loads config.json, so this Rust-side default is only a placeholder
+    /// for the brief window before that happens.
+    #[serde(default = "default_locale")]
+    pub locale: String,
 }
 
 fn default_theme() -> String {
     "dark".into()
+}
+
+fn default_locale() -> String {
+    "en".into()
 }
 
 impl Default for ConfigFile {
@@ -157,6 +167,7 @@ impl Default for ConfigFile {
             font_level: 3,
             line_level: 2,
             theme: default_theme(),
+            locale: default_locale(),
         }
     }
 }

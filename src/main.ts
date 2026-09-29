@@ -25,6 +25,8 @@ import { TextSizeChip } from "./ui/text-chip";
 import { loadTextSettings } from "./ui/text-settings";
 import { ThemeChip } from "./ui/theme-chip";
 import { loadTheme } from "./ui/theme-settings";
+import { LanguageChip } from "./ui/language-chip";
+import { loadLocale } from "./i18n";
 import { showAbout } from "./ui/about";
 import { confirmCloseWindow } from "./ui/confirm-close";
 import "./styles/launcher.css";
@@ -170,6 +172,7 @@ new TextSizeChip(app.querySelector<HTMLElement>(".res-mini")!, (fontSize, lineHe
   tabs.applyTextSettings(fontSize, lineHeight),
 );
 new ThemeChip(app.querySelector<HTMLElement>(".res-mini")!, (themeId) => tabs.applyTheme(themeId));
+new LanguageChip(app.querySelector<HTMLElement>(".res-mini")!);
 const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
 );
@@ -315,6 +318,7 @@ async function start() {
   // doesn't flash at the default before jumping to the saved size.
   await loadTextSettings();
   await loadTheme();
+  await loadLocale();
   const auto = await resolveAutoOpen();
   if (auto) {
     await openEntry(auto);
