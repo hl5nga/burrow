@@ -52,6 +52,11 @@
 
 .res-hud {
   position: absolute;
+  /* Without this, a same-stacking-context sibling that's merely `position:
+     relative` (e.g. the launcher row's toggle switch) can still paint over
+     this card if it comes later in the DOM — z-index:auto ties break on DOM
+     order, not visual layering intent. An explicit value always wins. */
+  z-index: 10;
   top: 30px;
   right: 0;
   width: 240px;
