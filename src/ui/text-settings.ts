@@ -1,7 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 
-/** Font size levels 1 (smallest) .. 5 (largest); index 0 = level 1. */
-export const FONT_SIZES = [11, 12.5, 13.5, 15, 17];
+/**
+ * Font size levels 1 (smallest) .. 5 (largest); index 0 = level 1. Shifted
+ * down from an earlier [11, 12.5, 13.5, 15, 17]: at 13.5px (old level 3, the
+ * default), Burrow's monospace computed ~11% fewer columns than a typical
+ * terminal's ~12px default at the same window width, so a remote CLI's
+ * column-sensitive prompt box could wrap in Burrow but not elsewhere at the
+ * same window size. Level 3 now sits at 11.5px — comfortably under that
+ * 12px reference point rather than merely matching it — so levels 1-3 all
+ * have real margin before hitting the same wrap.
+ */
+export const FONT_SIZES = [9.5, 10.5, 11.5, 13, 15];
 /** Line spacing levels 1 (tight) .. 3 (loose); index 0 = level 1. */
 export const LINE_HEIGHTS = [1.0, 1.2, 1.4];
 

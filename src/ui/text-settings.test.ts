@@ -4,7 +4,7 @@ import { FONT_SIZES, LINE_HEIGHTS, fontSizePx, lineHeightFor } from "./text-sett
 
 test("levels map to the documented px/multiplier tables", () => {
   assert.equal(fontSizePx(1), FONT_SIZES[0]);
-  assert.equal(fontSizePx(3), 13.5);
+  assert.equal(fontSizePx(3), 11.5);
   assert.equal(fontSizePx(5), FONT_SIZES[4]);
   assert.equal(lineHeightFor(1), 1.0);
   assert.equal(lineHeightFor(2), 1.2);
