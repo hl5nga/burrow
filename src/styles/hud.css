@@ -265,6 +265,74 @@
   font-weight: 700;
 }
 
+.rm-chip.theme {
+  font-family: var(--ui);
+  font-size: 10px;
+}
+
+.theme-card {
+  width: 170px;
+}
+
+.theme-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-option {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 8px;
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--text-mid);
+  border-radius: 6px;
+  cursor: default;
+}
+
+.theme-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-hi);
+}
+
+.theme-option.active {
+  color: var(--text-hi);
+  background: rgba(255, 176, 0, 0.12);
+}
+
+.theme-swatch {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.swatch-dark {
+  background: #111317;
+}
+
+.swatch-light {
+  background: #f5f5f4;
+}
+
+.swatch-sky {
+  background: #eef3fb;
+}
+
+.swatch-paper {
+  background: #f3ecdd;
+}
+
+.swatch-mono {
+  background: #cfcfcf;
+}
+
 .text-card {
   width: 210px;
 }

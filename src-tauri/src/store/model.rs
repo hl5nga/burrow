@@ -135,6 +135,15 @@ pub struct ConfigFile {
     pub font_level: u8,
     /// Terminal line spacing, 1 (tight) to 3 (loose); 2 is the default.
     pub line_level: u8,
+    /// Color profile id ("dark", "light", "sky", "paper", "mono"); validated
+    /// against the known set in the frontend (src/ui/theme-settings.ts), not
+    /// here, so a new theme never needs a Rust change.
+    #[serde(default = "default_theme")]
+    pub theme: String,
+}
+
+fn default_theme() -> String {
+    "dark".into()
 }
 
 impl Default for ConfigFile {
@@ -147,6 +156,7 @@ impl Default for ConfigFile {
             auto_open_id: None,
             font_level: 3,
             line_level: 2,
+            theme: default_theme(),
         }
     }
 }

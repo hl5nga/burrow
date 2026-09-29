@@ -272,6 +272,11 @@ export class TabManager {
     for (const tab of this.tabs) tab.session?.setTextSize(fontSize, lineHeight);
   }
 
+  /** Applies a new color profile to every open tab's terminal immediately. */
+  applyTheme(themeId: string) {
+    for (const tab of this.tabs) tab.session?.setTheme(themeId);
+  }
+
   /** Each tab's host for the CPU/RAM monitor, with a hook for its tab dot. */
   resourceTargets(): ResourceTarget[] {
     return this.tabs.map((tab) => ({

@@ -23,6 +23,8 @@ import { Launcher, resolveAutoOpen, type LauncherEntry } from "./ui/launcher";
 import { NetworkChip } from "./ui/network-chip";
 import { TextSizeChip } from "./ui/text-chip";
 import { loadTextSettings } from "./ui/text-settings";
+import { ThemeChip } from "./ui/theme-chip";
+import { loadTheme } from "./ui/theme-settings";
 import { showAbout } from "./ui/about";
 import { confirmCloseWindow } from "./ui/confirm-close";
 import "./styles/launcher.css";
@@ -96,7 +98,10 @@ function showContext(context: SessionContext | undefined) {
   // is still unknown — show a placeholder so the button stays visible and
   // clickable instead of disappearing.
   status.cwd.textContent = context?.cwd || "폴더 보기";
-  status.cwd.classList.toggle("placeholder", !context?.cwd);
+  // Dim only when the button truly can't do anything (a tab the user ssh'd
+  // into by hand, outside Burrow's SSH profiles) — not just because cwd
+  // hasn't arrived yet, since the file browser can still fetch it itself now.
+  status.cwd.classList.toggle("placeholder", !!tabs.activeTarget()?.foreignShell);
   status.branch.hidden = !context?.branch;
   status.branchName.textContent = context?.branch ?? "";
 }
@@ -164,6 +169,7 @@ new NetworkChip(app.querySelector<HTMLElement>(".res-mini")!);
 new TextSizeChip(app.querySelector<HTMLElement>(".res-mini")!, (fontSize, lineHeight) =>
   tabs.applyTextSettings(fontSize, lineHeight),
 );
+new ThemeChip(app.querySelector<HTMLElement>(".res-mini")!, (themeId) => tabs.applyTheme(themeId));
 const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
 );
@@ -308,6 +314,7 @@ async function start() {
   // Before any tab opens, so the very first one is sized correctly and
   // doesn't flash at the default before jumping to the saved size.
   await loadTextSettings();
+  await loadTheme();
   const auto = await resolveAutoOpen();
   if (auto) {
     await openEntry(auto);

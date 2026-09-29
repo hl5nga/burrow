@@ -24,6 +24,66 @@
   color-scheme: dark;
 }
 
+/* Color profiles (Theme chip, top-right corner). "dark" is the default set
+   above; each of these overrides the same variables for a different look.
+   Terminal ANSI colors are separate (src/terminal/themes.ts) since xterm
+   reads its palette once per session, not through CSS. */
+:root[data-theme="light"] {
+  --placeholder: rgba(90, 95, 100, 0.35);
+  --bg-panel: #f5f5f4;
+  --bg-elevated: #ffffff;
+  --border: #d8d8d6;
+  --amber: #b5730a;
+  --cyan: #0c8f82;
+  --text-hi: #1a1b1e;
+  --text-mid: #52565c;
+  --text-dim: #8b9096;
+  --success: #1f9d5c;
+  color-scheme: light;
+}
+
+:root[data-theme="sky"] {
+  --placeholder: rgba(90, 110, 130, 0.35);
+  --bg-panel: #eef3fb;
+  --bg-elevated: #f7faff;
+  --border: #cbdaf0;
+  --amber: #b5730a;
+  --cyan: #0f7c9e;
+  --text-hi: #1c2b3e;
+  --text-mid: #4f6070;
+  --text-dim: #8496a8;
+  --success: #1f9d5c;
+  color-scheme: light;
+}
+
+:root[data-theme="paper"] {
+  --placeholder: rgba(120, 105, 70, 0.35);
+  --bg-panel: #f3ecdd;
+  --bg-elevated: #faf5e9;
+  --border: #ddd0b2;
+  --amber: #a1631a;
+  --cyan: #4c7f78;
+  --text-hi: #2b2419;
+  --text-mid: #5c5140;
+  --text-dim: #948968;
+  --success: #4d7c3a;
+  color-scheme: light;
+}
+
+:root[data-theme="mono"] {
+  --placeholder: rgba(90, 90, 90, 0.35);
+  --bg-panel: #f2f2f2;
+  --bg-elevated: #ffffff;
+  --border: #d4d4d4;
+  --amber: #4a4a4a;
+  --cyan: #4a4a4a;
+  --text-hi: #141414;
+  --text-mid: #5a5a5a;
+  --text-dim: #9a9a9a;
+  --success: #3a3a3a;
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

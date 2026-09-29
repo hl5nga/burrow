@@ -10,6 +10,8 @@ import { HOOK_OSC, parseHookEvent, type HookEvent } from "./hook-events";
 import { BlockTracker } from "./blocks";
 import { copyText } from "../ui/clipboard";
 import { current as textSettings, fontSizePx, lineHeightFor } from "../ui/text-settings";
+import { current as themeSettings } from "../ui/theme-settings";
+import { terminalThemeFor } from "./themes";
 
 interface PtyExit {
   id: number;
@@ -38,30 +40,6 @@ async function loadTerminalFonts(fontFamily: string, fontSize: number) {
   ]);
 }
 
-const theme = {
-  background: "#111317",
-  foreground: "#eeece6",
-  cursor: "#ffb000",
-  cursorAccent: "#111317",
-  selectionBackground: "rgba(255, 176, 0, 0.30)",
-  black: "#15171b",
-  red: "#ff6259",
-  green: "#54d68a",
-  yellow: "#ffb000",
-  blue: "#6aa8ff",
-  magenta: "#9b8cff",
-  cyan: "#4be3d0",
-  white: "#d8d6d0",
-  brightBlack: "#5b6167",
-  brightRed: "#ff8a83",
-  brightGreen: "#7fe3a8",
-  brightYellow: "#ffc947",
-  brightBlue: "#94c1ff",
-  brightMagenta: "#b9aeff",
-  brightCyan: "#7eeede",
-  brightWhite: "#eeece6",
-};
-
 export interface TerminalSession {
   term: Terminal;
   context(): SessionContext;
@@ -89,6 +67,8 @@ export interface TerminalSession {
   hookEvent(data: string): void;
   /** Applies a new font size (px) and line-height (multiplier) live. */
   setTextSize(fontSize: number, lineHeight: number): void;
+  /** Applies a new color profile's ANSI palette live. */
+  setTheme(themeId: string): void;
   /** Prints a dim status line into the terminal (not sent to the process). */
   notice(text: string): void;
   focus(): void;
@@ -143,7 +123,7 @@ export async function openTerminalSession(
     cursorBlink: true,
     scrollback: 10000,
     allowProposedApi: true,
-    theme,
+    theme: terminalThemeFor(themeSettings.theme),
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
@@ -337,6 +317,9 @@ export async function openTerminalSession(
       // A changed cell size leaves the old glyphs cached at the wrong size.
       term.clearTextureAtlas();
       fit.fit();
+    },
+    setTheme(themeId) {
+      term.options.theme = terminalThemeFor(themeId);
     },
     hookEvent(data) {
       if (!oscSeen) handleHookData(data);
