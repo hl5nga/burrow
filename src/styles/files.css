@@ -299,3 +299,7 @@
 .statusbar .seg.cwd:hover {
   color: var(--text-hi);
 }
+
+.statusbar .seg.cwd.placeholder {
+  color: var(--placeholder);
+}

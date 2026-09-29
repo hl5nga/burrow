@@ -117,11 +117,29 @@ export class FileBrowser {
     if (!force && !changedTab && cwd === this.shellCwd) return;
     this.shellCwd = cwd;
     if (!this.isOpen) return;
-    if (cwd) this.navigate(cwd);
-    else
-      this.showMessage(
-        "현재 폴더를 아직 모릅니다 — 훅이 있는 셸에서 명령을 한 번 실행하면 나타납니다",
-      );
+    if (cwd) return this.navigate(cwd);
+    if (target?.profileId && !target.foreignShell) {
+      // No hook event yet — often because the tmux pane already had an agent
+      // running in the foreground when this tab attached, so its shell never
+      // returned to a prompt to fire `precmd`. Ask the host directly instead
+      // of waiting for an event that may never come.
+      return this.locateRemoteCwd(target.profileId);
+    }
+    this.showMessage(
+      "현재 폴더를 아직 모릅니다 — 훅이 있는 셸에서 명령을 한 번 실행하면 나타납니다",
+    );
+  }
+
+  private async locateRemoteCwd(profileId: string) {
+    const id = ++this.request;
+    this.showMessage("원격 폴더를 확인하는 중…");
+    try {
+      const cwd = await invoke<string>("remote_cwd", { profileId });
+      if (id !== this.request || this.target?.profileId !== profileId) return;
+      this.navigate(cwd);
+    } catch (err) {
+      if (id === this.request) this.showMessage(String(err));
+    }
   }
 
   private navigate(path: string) {

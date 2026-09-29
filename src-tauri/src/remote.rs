@@ -340,6 +340,31 @@ pub fn remote_probe(
     })
 }
 
+/// The active tmux pane's folder for a profile that has a tmux session
+/// configured, or the login shell's home directory otherwise — a fallback
+/// for the file browser when no hook event has told it the cwd yet (e.g. the
+/// pane already had an agent running, foreground, when the tab attached, so
+/// its shell never returned to a prompt to fire `precmd`).
+#[tauri::command(async)]
+pub fn remote_cwd(
+    store: tauri::State<'_, Arc<Store>>,
+    profile_id: String,
+) -> Result<String, String> {
+    let profile = load_profile(&store, &profile_id)?;
+    let script = match &profile.tmux_session {
+        Some(session) => format!(
+            "T=$(command -v tmux || ls /opt/homebrew/bin/tmux /usr/local/bin/tmux 2>/dev/null | head -1); \
+             \"$T\" display-message -t {session} -p '#{{pane_current_path}}' 2>/dev/null || \"${{SHELL:-sh}}\" -lc pwd"
+        ),
+        None => "\"${SHELL:-sh}\" -lc pwd".to_string(),
+    };
+    let out = side_command(&store, &profile, &script, None)?;
+    match out.lines().next().map(str::trim) {
+        Some(path) if !path.is_empty() => Ok(path.to_string()),
+        _ => Err("현재 폴더를 확인하지 못했습니다".into()),
+    }
+}
+
 /// The path goes into mosh's command line and then a remote shell: plain
 /// absolute paths only.
 fn valid_server_path(path: &str) -> bool {

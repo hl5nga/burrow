@@ -91,7 +91,12 @@ function showConnection(connection: Connection | undefined) {
 
 function showContext(context: SessionContext | undefined) {
   status.host.textContent = context?.host ?? "local";
-  status.cwd.textContent = context?.cwd ?? "";
+  // Before the shell's first prompt (or for an SSH tab whose tmux pane was
+  // already busy when it attached, so no hook event has arrived at all) cwd
+  // is still unknown — show a placeholder so the button stays visible and
+  // clickable instead of disappearing.
+  status.cwd.textContent = context?.cwd || "폴더 보기";
+  status.cwd.classList.toggle("placeholder", !context?.cwd);
   status.branch.hidden = !context?.branch;
   status.branchName.textContent = context?.branch ?? "";
 }
