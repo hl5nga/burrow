@@ -231,7 +231,7 @@
 .viewer-md pre {
   padding: 12px 14px;
   overflow: auto;
-  background: #0c0e11;
+  background: var(--bg-panel);
   border-radius: 8px;
 }
 

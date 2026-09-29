@@ -27,7 +27,7 @@
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.5),
     0 40px 100px -20px rgba(0, 0, 0, 0.75),
-    0 0 90px -30px rgba(255, 176, 0, 0.35);
+    0 0 90px -30px color-mix(in srgb, var(--amber) 35%, transparent);
 }
 
 .palette-search {
@@ -76,7 +76,7 @@
 }
 
 .palette-section + .palette-section {
-  border-top: 1px solid #1a1d22;
+  border-top: 1px solid var(--border);
 }
 
 .palette-section .sec-title {
@@ -97,7 +97,7 @@
 }
 
 .palette-item.hi {
-  background: rgba(255, 176, 0, 0.08);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
 }
 
 .palette-item.disabled {
@@ -118,14 +118,14 @@
 
 .p-icon.shell {
   color: var(--amber);
-  background: rgba(255, 176, 0, 0.08);
-  border: 1px solid rgba(255, 176, 0, 0.2);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 20%, transparent);
 }
 
 .p-icon.ssh {
   color: var(--cyan);
-  background: rgba(75, 227, 208, 0.09);
-  border: 1px solid rgba(75, 227, 208, 0.25);
+  background: color-mix(in srgb, var(--cyan) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cyan) 25%, transparent);
 }
 
 .palette-item .p-main {
@@ -163,8 +163,8 @@
   font-family: var(--mono);
   font-size: 11px;
   color: var(--amber);
-  background: rgba(255, 176, 0, 0.07);
-  border: 1px solid rgba(255, 176, 0, 0.18);
+  background: color-mix(in srgb, var(--amber) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 18%, transparent);
   border-radius: 20px;
 }
 

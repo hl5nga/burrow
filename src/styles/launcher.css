@@ -68,7 +68,7 @@
 }
 
 .launcher-row:hover {
-  border-color: rgba(255, 176, 0, 0.35);
+  border-color: color-mix(in srgb, var(--amber) 35%, transparent);
 }
 
 .launcher-row.disabled {
@@ -94,8 +94,8 @@
 
 .launcher-icon.local {
   color: var(--amber);
-  background: rgba(255, 176, 0, 0.08);
-  border: 1px solid rgba(255, 176, 0, 0.25);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 25%, transparent);
 }
 
 .launcher-icon.local svg {
@@ -105,8 +105,8 @@
 
 .launcher-icon.ssh {
   color: var(--cyan);
-  background: rgba(75, 227, 208, 0.08);
-  border: 1px solid rgba(75, 227, 208, 0.25);
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cyan) 25%, transparent);
 }
 
 .launcher-dot {
@@ -191,8 +191,8 @@
 }
 
 .launcher-auto input.switch:checked {
-  background: rgba(255, 176, 0, 0.25);
-  border-color: rgba(255, 176, 0, 0.5);
+  background: color-mix(in srgb, var(--amber) 25%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 50%, transparent);
 }
 
 .launcher-auto input.switch:checked::after {
@@ -240,5 +240,5 @@
 
 .launcher-new:hover {
   color: var(--amber);
-  border-color: rgba(255, 176, 0, 0.4);
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
 }
