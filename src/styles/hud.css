@@ -274,10 +274,19 @@
 }
 
 .text-row-label {
-  display: block;
+  display: inline-block;
   margin-bottom: 6px;
   font-size: 11px;
   color: var(--text-dim);
+}
+
+.text-row-level {
+  display: inline-block;
+  float: right;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-mid);
 }
 
 .text-stepper {

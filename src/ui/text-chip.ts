@@ -57,7 +57,10 @@ export class TextSizeChip {
     const head = el("div", "rh-head", "글자·줄 간격");
 
     const fontRow = el("div", "text-row");
-    fontRow.append(el("span", "text-row-label", "글자 크기"));
+    fontRow.append(
+      el("span", "text-row-label", "글자 크기"),
+      el("span", "text-row-level", `${current.fontLevel}/${FONT_SIZES.length}`),
+    );
     const fontControls = el("div", "text-stepper");
     const dec = el("button", "text-step", "－");
     const preview = el("span", "text-preview", "Aa 가나 123");
