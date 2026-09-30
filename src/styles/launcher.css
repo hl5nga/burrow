@@ -231,27 +231,23 @@
 
 .launcher-edit {
   all: unset;
-  box-sizing: border-box;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Bigger than the glyph needs — the "✎" pencil emoji's actual ink sits
-     well inside its own em-box with a lot of invisible side-padding baked
-     into the font metrics, so a tightly-sized button leaves a sliver of
-     dead click zone right around the visible pencil. */
-  width: 34px;
-  height: 34px;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--text-dim);
-  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 7px;
   cursor: default;
 }
 
 .launcher-edit:hover {
   color: var(--text-hi);
   background: color-mix(in srgb, var(--text-hi) 8%, transparent);
+}
+
+.launcher-edit:disabled {
+  color: var(--text-dim);
 }
 
 .launcher-hint {

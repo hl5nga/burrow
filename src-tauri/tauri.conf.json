@@ -18,7 +18,6 @@
         "height": 780,
         "minWidth": 720,
         "minHeight": 480,
-        "maximized": true,
         "backgroundColor": "#111317",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
