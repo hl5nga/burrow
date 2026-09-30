@@ -282,15 +282,16 @@ export class Launcher {
 
     let edit: HTMLButtonElement | undefined;
     if (isSsh) {
-      edit = el("button", "launcher-edit", t("launcher.edit"));
+      edit = el("button", "launcher-edit", "✎");
       edit.type = "button";
+      edit.title = t("launcher.edit");
       edit.addEventListener("click", (e) => {
         e.stopPropagation();
         this.handleEdit(entry.profile);
       });
     }
 
-    row.append(icon(entry), dot, main, auto, connect, ...(edit ? [edit] : []));
+    row.append(icon(entry), dot, main, ...(edit ? [edit] : []), auto, connect);
     row.addEventListener("click", (e) => {
       // Clicks on the row's own controls (Connect, Edit, the auto-open switch)
       // are theirs alone — never also a "connect" on the row itself.

@@ -238,13 +238,19 @@
 
 .launcher-edit {
   all: unset;
+  box-sizing: border-box;
   flex-shrink: 0;
-  padding: 6px 12px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-mid);
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Bigger than the glyph needs — the "✎" pencil's ink sits well inside its
+     em-box, so a tight button leaves dead click zone around the visible pencil. */
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-dim);
+  border-radius: 8px;
   cursor: default;
 }
 
