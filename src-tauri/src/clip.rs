@@ -192,3 +192,19 @@ pub fn clip_text_write(text: String) -> Result<(), String> {
     child.wait().map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[cfg(test)]
+mod text_tests {
+    use super::*;
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn korean_text_survives_the_clipboard() {
+        clip_text_write("권장안 Bill/Supplier를 Copy Equipment의 대상 범위".into()).unwrap();
+        let out = std::process::Command::new("pbpaste").output().unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "권장안 Bill/Supplier를 Copy Equipment의 대상 범위"
+        );
+    }
+}
