@@ -8,9 +8,12 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 }
 
 const LABEL: Record<Locale, string> = { ko: "한국어", en: "English" };
+// A flag, not the same globe glyph as the network chip right next to it —
+// the two chips were easy to mix up at a glance.
+const FLAG: Record<Locale, string> = { ko: "🇰🇷", en: "🇺🇸" };
 
 /**
- * "🌐 KO"/"🌐 EN" chip — the forced language override the user asked for,
+ * "🇰🇷 KO"/"🇺🇸 EN" chip — the forced language override the user asked for,
  * separate from the automatic OS-locale detection (src/i18n/index.ts's
  * detectLocale(), used only the very first run). Reusable: one instance
  * lives on the Launcher (the first screen), another in the main window's
@@ -46,7 +49,7 @@ export class LanguageChip {
   }
 
   private renderChip() {
-    this.chip.textContent = `🌐 ${getLocale().toUpperCase()}`;
+    this.chip.textContent = `${FLAG[getLocale()]} ${getLocale().toUpperCase()}`;
   }
 
   private async set(next: Locale) {
@@ -59,12 +62,9 @@ export class LanguageChip {
     const head = el("div", "rh-head", t("language.label"));
     const menu = el("div", "theme-menu");
     for (const id of LOCALES) {
-      const opt = el(
-        "button",
-        id === getLocale() ? "theme-option active" : "theme-option",
-        LABEL[id],
-      );
+      const opt = el("button", id === getLocale() ? "theme-option active" : "theme-option");
       opt.type = "button";
+      opt.append(document.createTextNode(`${FLAG[id]} ${LABEL[id]}`));
       opt.addEventListener("click", () => void this.set(id));
       menu.append(opt);
     }
