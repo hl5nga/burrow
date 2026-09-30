@@ -224,6 +224,25 @@
   background: color-mix(in srgb, var(--text-hi) 6%, transparent);
 }
 
+.launcher-edit {
+  all: unset;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  color: var(--text-dim);
+  border-radius: 6px;
+  cursor: default;
+}
+
+.launcher-edit:hover {
+  color: var(--text-hi);
+  background: color-mix(in srgb, var(--text-hi) 8%, transparent);
+}
+
 .launcher-hint {
   padding: 14px 4px;
   font-size: 12px;

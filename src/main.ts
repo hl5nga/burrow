@@ -351,6 +351,12 @@ async function openEntry(entry: LauncherEntry) {
   else await connectProfile(tabs, entry.profile, vpn);
 }
 
+/** Launcher's edit-icon click: opens the profile in the command manager
+ * (the same form ⌘, does), the launcher itself hidden underneath. */
+function editProfile(profile: StoredCommand, onDone: () => void) {
+  void manager.open(profile.id, onDone);
+}
+
 /**
  * Startup: a configured auto-open target skips the connection list entirely
  * (T25); otherwise the list is shown and whichever entry the user picks opens.
@@ -367,7 +373,7 @@ async function start() {
     await openEntry(auto);
   } else {
     let entry: LauncherEntry | undefined;
-    while (!entry) entry = await new Launcher(app, openNewSshProfile).open();
+    while (!entry) entry = await new Launcher(app, openNewSshProfile, false, editProfile).open();
     await openEntry(entry);
   }
   await frequent.init();
@@ -376,7 +382,7 @@ void start();
 
 /** Menu bar → Burrow → 연결 목록 보기: the same list, dismissible this time. */
 async function viewStartup() {
-  const entry = await new Launcher(app, openNewSshProfile, true).open();
+  const entry = await new Launcher(app, openNewSshProfile, true, editProfile).open();
   if (entry) await openEntry(entry);
 }
 void listen("menu-view-startup", () => void viewStartup());
