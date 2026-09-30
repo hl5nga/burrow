@@ -136,6 +136,7 @@
 }
 
 .freq-item.top .fi-key {
+  color: var(--amber-fg);
   background: var(--amber-fill);
 }
 

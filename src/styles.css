@@ -4,13 +4,24 @@
   --bg-panel: #111317;
   --bg-elevated: #15171b;
   --border: #24282e;
+  /* The app's one accent color — active/hover text and icons, translucent
+     tints and borders on selected rows, and (via --amber-fill/--amber-fg)
+     solid button fills. Every theme below picks its OWN hue for this
+     (dark's bright orange, sky's deep blue to match its cyan family,
+     paper's warm brown, mono's neutral gray) rather than all reusing
+     dark's orange — a brown button looked like a leftover, mismatched
+     patch on a theme that's otherwise blue or gray. */
   --amber: #ffb000;
-  /* For a solid button/chip fill that has dark text sitting on top of it
-     (`.btn`, `.launcher-connect`, `.fi-key`) — normally identical to
-     --amber, but mono's --amber is deliberately dark (it doubles as small
-     accent TEXT on a near-white panel there), which would make dark button
-     text unreadable if used as the fill too. Only mono overrides this. */
+  /* Solid fill + its paired text color, for a filled button/badge
+     (`.btn`, `.launcher-connect`, `.fi-key`) — usually --amber itself
+     (already saturated enough), but mono's --amber is deliberately dark
+     (it doubles as small accent TEXT on a near-white panel there), so
+     mono alone overrides the fill to something lighter. --amber-fg is the
+     text color that actually contrasts against --amber-fill: dark theme's
+     bright orange wants dark text, everything else here is deep enough to
+     want white text. */
   --amber-fill: var(--amber);
+  --amber-fg: #0a0b0d;
   --cyan: #4be3d0;
   --text-hi: #eeece6;
   --text-mid: #9aa0a6;
@@ -57,7 +68,11 @@
   --bg-panel: #f5f5f4;
   --bg-elevated: #ffffff;
   --border: #d8d8d6;
-  --amber: #b5730a;
+  /* A clean, hue-neutral accent blue — this theme has no color identity of
+     its own to match (bg is plain gray), so a common "primary action" blue
+     reads better here than importing dark's orange as a brown. */
+  --amber: #2563eb;
+  --amber-fg: #ffffff;
   --cyan: #0c8f82;
   --text-hi: #1a1b1e;
   --text-mid: #52565c;
@@ -73,7 +88,10 @@
   --bg-panel: #eef3fb;
   --bg-elevated: #f7faff;
   --border: #cbdaf0;
-  --amber: #b5730a;
+  /* Same blue family as --cyan below (the SSH badge's color), just deeper —
+     matches this theme's own blue identity instead of dark's orange. */
+  --amber: #146a8c;
+  --amber-fg: #ffffff;
   --cyan: #0f7c9e;
   --text-hi: #1c2b3e;
   --text-mid: #4f6070;
@@ -89,7 +107,10 @@
   --bg-panel: #f3ecdd;
   --bg-elevated: #faf5e9;
   --border: #ddd0b2;
+  /* Kept as its own warm brown, unlike light/sky — paper's whole palette is
+     sepia-toned, so this is the one theme where that hue already belongs. */
   --amber: #a1631a;
+  --amber-fg: #ffffff;
   --cyan: #4c7f78;
   --text-hi: #2b2419;
   --text-mid: #5c5140;
