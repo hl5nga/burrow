@@ -15,6 +15,12 @@
   display: none;
 }
 
+/* In a tab: fills the tab's body, leaving the tab bar and other tabs alone. */
+.launcher-overlay.inline {
+  position: absolute;
+  z-index: 5;
+}
+
 .launcher {
   width: min(560px, calc(100vw - 48px));
   max-height: calc(100vh - 80px);

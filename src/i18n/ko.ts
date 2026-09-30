@@ -264,6 +264,7 @@ export default {
     newTabTitle: "새 탭 (⌘T)",
     closeTabTitle: "탭 닫기 (⌘W)",
     localLabel: "로컬",
+    newTabLabel: "새 탭",
     remoteLabel: "원격",
     moshTrackingFailed: "Mosh 탭의 명령 추적을 시작하지 못했습니다: {{error}}",
     pasteImageForeignShell:

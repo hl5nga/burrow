@@ -118,6 +118,8 @@ export class Launcher {
      * the command manager, and calls back once it's closed so the list can
      * reload (the name/host shown may have changed). */
     private readonly onEditProfile?: (profile: StoredCommand, onDone: () => void) => void,
+    /** Fills its `root` (a tab's body) instead of covering the whole window. */
+    inline = false,
   ) {
     const box = el("div", "launcher");
     const head = el("div", "launcher-head");
@@ -130,6 +132,7 @@ export class Launcher {
     box.append(head, this.sub, this.list);
     this.overlay.append(box);
     this.overlay.setAttribute("data-tauri-drag-region", "");
+    this.overlay.classList.toggle("inline", inline);
     this.overlay.tabIndex = -1;
     this.overlay.addEventListener("mousedown", (e) => {
       if (this.dismissible && e.target === this.overlay) this.resolveEntry?.(undefined);
@@ -160,6 +163,11 @@ export class Launcher {
       this.unsubLocale?.();
       if (this.dismissible) previous?.focus();
     });
+  }
+
+  /** Gives up without picking anything (e.g. the tab it lives in was closed). */
+  cancel() {
+    this.resolveEntry?.(undefined);
   }
 
   private retranslate() {

@@ -149,7 +149,7 @@ const tabs = new TabManager(
       return true;
     },
     onLastTabClosed: () => getCurrentWindow().close(),
-    onNewTabRequest: () => void viewStartup(),
+    onNewTabRequest: () => void newTabPicker(),
   },
 );
 const activeSession = () => tabs.activeSession();
@@ -262,7 +262,7 @@ keys.register({
 keys.register({
   id: "new-tab",
   label: t("keybindings.actions.newTab"),
-  run: () => void viewStartup(),
+  run: () => void newTabPicker(),
 });
 keys.register({
   id: "close-tab",
@@ -380,6 +380,14 @@ async function start() {
   await frequent.init();
 }
 void start();
+
+/** ＋ / ⌘T: a new tab that shows the connection list inside itself. */
+async function newTabPicker() {
+  await tabs.pickInNewTab(
+    (host) => new Launcher(host, openNewSshProfile, false, editProfile, true),
+    openEntry,
+  );
+}
 
 /** Menu bar → Burrow → 연결 목록 보기: the same list, dismissible this time. */
 async function viewStartup() {

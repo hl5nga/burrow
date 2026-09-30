@@ -274,6 +274,7 @@ const en: Loose<typeof ko> = {
     newTabTitle: "New tab (⌘T)",
     closeTabTitle: "Close tab (⌘W)",
     localLabel: "Local",
+    newTabLabel: "New tab",
     remoteLabel: "Remote",
     moshTrackingFailed: "Couldn't start command tracking on the Mosh tab: {{error}}",
     pasteImageForeignShell:

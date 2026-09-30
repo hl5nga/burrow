@@ -53,6 +53,8 @@ interface Tab {
   /** This tab's profile's vpnPostDisconnect, only set if the VPN step
    * actually ran for THIS connection (never for a home-network connect). */
   vpnDisconnectCmd?: string;
+  /** Runs when the tab is closed (a connection picker tab cancels its picker). */
+  onClose?: () => void;
 }
 
 /** What tab-level observers (the agent monitor) get to see of a tab. */
@@ -422,6 +424,61 @@ export class TabManager {
     }
   }
 
+  /**
+   * ＋ new tab: a tab of its own whose body is the connection picker, so the
+   * open tabs stay exactly as they are. Picking an entry opens it as a normal
+   * tab in that spot; closing the picker tab cancels.
+   */
+  async pickInNewTab<E>(
+    make: (host: HTMLElement) => { open(): Promise<E | undefined>; cancel(): void },
+    open: (entry: E) => Promise<void>,
+  ) {
+    const host = document.createElement("div");
+    host.className = "term-host";
+    this.body.append(host);
+    const element = document.createElement("div");
+    element.className = "tab";
+    const label = document.createElement("span");
+    label.className = "tab-label";
+    label.textContent = t("tabs.newTabLabel");
+    const close = document.createElement("span");
+    close.className = "close";
+    close.textContent = "×";
+    close.title = t("tabs.closeTabTitle");
+    element.append(
+      Object.assign(document.createElement("span"), { className: "dot" }),
+      label,
+      close,
+    );
+    this.bar.insertBefore(element, this.bar.lastElementChild);
+    const tab: Tab = {
+      id: this.nextId++,
+      host,
+      label,
+      element,
+      context: { host: "", cwd: "", branch: "" },
+    };
+    this.tabs.push(tab);
+    element.addEventListener("mousedown", (e) => {
+      if (e.target !== close) this.activate(tab);
+    });
+    close.addEventListener("click", () => this.close(tab));
+    this.activate(tab);
+
+    for (;;) {
+      const picker = make(host);
+      tab.onClose = () => picker.cancel();
+      const entry = await picker.open();
+      if (entry === undefined || !this.tabs.includes(tab)) break;
+      const before = this.tabs.length;
+      await open(entry);
+      // A failed connect leaves no new tab: stay on the picker to try again.
+      if (this.tabs.length > before) break;
+    }
+    tab.onClose = undefined;
+    if (this.tabs.includes(tab)) this.remove(tab);
+  }
+
   close(tab = this.active) {
     if (!tab || !this.tabs.includes(tab)) return;
     if (this.tabs.length === 1) {
@@ -444,6 +501,7 @@ export class TabManager {
     void tab.eventStream?.then((id) => id && invoke("remote_event_stop", { id }).catch(() => {}));
     for (const o of this.observers) o.onClosed(this.ref(tab));
     this.refs.delete(tab);
+    tab.onClose?.();
     tab.session?.dispose();
     tab.host.remove();
     tab.element.remove();

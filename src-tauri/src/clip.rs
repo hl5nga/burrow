@@ -173,7 +173,11 @@ mod tests {
 pub fn clip_text_write(text: String) -> Result<(), String> {
     use std::io::Write;
     use std::process::{Command, Stdio};
+    // pbcopy decodes stdin by the process locale: with a non-UTF-8 one the
+    // Korean text lands on the clipboard as mojibake. LC_ALL beats every other
+    // locale variable, so the app's own environment can't matter.
     let mut child = Command::new("pbcopy")
+        .env("LC_ALL", "UTF-8")
         .stdin(Stdio::piped())
         .spawn()
         .map_err(|e| e.to_string())?;
