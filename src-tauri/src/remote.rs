@@ -519,13 +519,16 @@ fn remote_command(
             Some(format!(
                 "exec zsh -lc 'W=\"{wrapper}\"; if command -v tmux >/dev/null; then \
                  tmux has-session -t \"={name}\" 2>/dev/null && tmux set-environment -t \"={name}\" ZDOTDIR \"$W\"{tmux_set}; \
-                 exec tmux new -A -s {name} -e ZDOTDIR=\"$W\"{tmux_e}; fi; \
-                 echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; {log_env}ZDOTDIR=\"$W\" exec zsh -l'"
+                 tmux new -A -s {name} -e ZDOTDIR=\"$W\"{tmux_e}; \
+                 echo \"burrow: tmux에서 나왔습니다 — 일반 셸입니다 (다시 들어가기: tmux new -A -s {name})\" >&2; \
+                 else echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; fi; \
+                 {log_env}ZDOTDIR=\"$W\" exec zsh -l'"
             ))
         }
         (Some(name), false) => Some(format!(
-            "exec \"${{SHELL:-sh}}\" -lc 'if command -v tmux >/dev/null; then exec tmux new -A -s {name}; fi; \
-             echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; exec \"${{SHELL:-sh}}\" -l'"
+            "exec \"${{SHELL:-sh}}\" -lc 'if command -v tmux >/dev/null; then tmux new -A -s {name}; \
+             echo \"burrow: tmux에서 나왔습니다 — 일반 셸입니다 (다시 들어가기: tmux new -A -s {name})\" >&2; \
+             else echo \"burrow: tmux가 없어 일반 셸로 접속합니다\" >&2; fi; exec \"${{SHELL:-sh}}\" -l'"
         )),
     }
 }
@@ -790,7 +793,9 @@ mod tests {
         assert!(hooked.contains("tmux new -A -s burrow -e ZDOTDIR=\"$W\""));
         assert!(hooked.contains("tmux set-environment -t \"=burrow\" ZDOTDIR"));
         let plain = remote_command(false, Some("burrow"), None).unwrap();
-        assert!(plain.contains("exec tmux new -A -s burrow;") && !plain.contains("ZDOTDIR"));
+        assert!(plain.contains("tmux new -A -s burrow;") && !plain.contains("exec tmux"));
+        assert!(plain.contains("exec \"${SHELL:-sh}\" -l") && !plain.contains("ZDOTDIR"));
+        assert!(hooked.contains("exec zsh -l") && !hooked.contains("exec tmux"));
     }
 
     #[test]
