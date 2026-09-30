@@ -16,7 +16,15 @@ interface Ranked {
 interface Config {
   promotionThreshold: number;
   frequentPanelOpen: boolean;
+  frequentPanelWidth: number;
 }
+
+const DEFAULT_WIDTH = 300;
+const MIN_WIDTH = 240;
+
+/** The widest the panel may get: most of the window stays for the terminal. */
+const maxWidth = () => Math.max(MIN_WIDTH, Math.min(760, Math.round(window.innerWidth * 0.6)));
+const clampWidth = (w: number) => Math.min(maxWidth(), Math.max(MIN_WIDTH, Math.round(w)));
 
 const LIMIT = 9;
 
@@ -79,6 +87,7 @@ export class FrequentPanel {
     this.element.append(head, this.list, this.foot);
     this.element.tabIndex = -1;
     this.element.addEventListener("keydown", (e) => this.onKey(e));
+    this.element.append(this.makeResizer());
 
     this.rail.append(
       el("span", "rail-icon", "★"),
@@ -156,8 +165,61 @@ export class FrequentPanel {
     if (this.lastHost !== undefined) this.render(this.lastCwd, this.lastThreshold);
   }
 
+  /**
+   * The drag handle on the panel's left edge. The terminal re-fits on its own
+   * as the panel changes width (it watches its container); double-click puts
+   * the width back to the default.
+   */
+  private makeResizer(): HTMLElement {
+    const handle = el("div", "freq-resizer");
+    handle.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch {
+        // No live pointer to capture (a synthetic event): the drag still works
+        // while the pointer stays over the handle.
+      }
+      const startX = e.clientX;
+      const startWidth = this.element.getBoundingClientRect().width;
+      handle.classList.add("dragging");
+      const move = (ev: PointerEvent) => {
+        this.setWidth(startWidth + (startX - ev.clientX));
+      };
+      const end = () => {
+        handle.classList.remove("dragging");
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", end);
+        handle.removeEventListener("pointercancel", end);
+        this.saveWidth();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", end);
+      handle.addEventListener("pointercancel", end);
+    });
+    handle.addEventListener("dblclick", () => {
+      this.setWidth(DEFAULT_WIDTH);
+      this.saveWidth();
+    });
+    return handle;
+  }
+
+  private setWidth(width: number) {
+    this.element.style.width = `${clampWidth(width)}px`;
+  }
+
+  private saveWidth() {
+    const width = Math.round(this.element.getBoundingClientRect().width);
+    invoke<Config>("store_get", { kind: "config" })
+      .then((config) =>
+        invoke("store_put", { kind: "config", value: { ...config, frequentPanelWidth: width } }),
+      )
+      .catch(() => {});
+  }
+
   async init() {
     const config = await invoke<Config>("store_get", { kind: "config" });
+    if (config.frequentPanelWidth) this.setWidth(config.frequentPanelWidth);
     this.applyOpen(config.frequentPanelOpen);
     await this.refresh();
   }

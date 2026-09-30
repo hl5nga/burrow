@@ -1,4 +1,5 @@
 .freq-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -203,4 +204,32 @@
   font-size: 10px;
   color: var(--text-dim);
   text-align: center;
+}
+
+/* Drag handle on the panel's left edge: a wide invisible hit area that shows a
+   line on hover. */
+.freq-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  z-index: 20;
+  width: 7px;
+  cursor: col-resize;
+}
+
+.freq-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.freq-resizer:hover::after,
+.freq-resizer.dragging::after {
+  background: var(--amber);
 }

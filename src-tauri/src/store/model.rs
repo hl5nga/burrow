@@ -125,6 +125,8 @@ pub struct ConfigFile {
     pub version: u32,
     pub promotion_threshold: u32,
     pub frequent_panel_open: bool,
+    /// Width in px of the right-hand panel when the user has dragged it.
+    pub frequent_panel_width: u32,
     /// Copy a selection as soon as the mouse is released (Linux terminal habit).
     pub copy_on_select: bool,
     /// "local", or an ssh-profile id: skip the startup connection list and
@@ -162,6 +164,7 @@ impl Default for ConfigFile {
             version: CURRENT_VERSION,
             promotion_threshold: 5,
             frequent_panel_open: true,
+            frequent_panel_width: 300,
             copy_on_select: false,
             auto_open_id: None,
             font_level: 3,
