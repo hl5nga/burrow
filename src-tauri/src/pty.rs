@@ -31,7 +31,7 @@ pub struct PtyState {
 /// Opt-in diagnostics (`open --env BURROW_TRACE_INPUT=1 Burrow.app`): appends
 /// every byte sent to a terminal process, escaped, to
 /// `$TMPDIR/burrow-input-trace.log` — for finding out where a stray key comes from.
-fn trace_input(id: u32, data: &[u8]) {
+pub(crate) fn trace_input(id: u32, data: &[u8]) {
     use std::io::Write as _;
     if std::env::var_os("BURROW_TRACE_INPUT").is_none() {
         return;

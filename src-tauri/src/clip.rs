@@ -172,6 +172,8 @@ mod tests {
 #[tauri::command]
 pub fn clip_text_write(text: String) -> Result<(), String> {
     use std::io::Write;
+    // Session 0 in the input trace = "what the app put on the clipboard".
+    crate::pty::trace_input(0, text.as_bytes());
     use std::process::{Command, Stdio};
     // pbcopy decodes stdin by the process locale: with a non-UTF-8 one the
     // Korean text lands on the clipboard as mojibake. LC_ALL beats every other
