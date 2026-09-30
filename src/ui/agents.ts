@@ -125,13 +125,23 @@ export class AgentMonitor implements TabObserver {
     });
     this.overlay.tabIndex = -1;
     document.body.append(this.overlay);
+    // Set directly rather than through retranslate() below: that also calls
+    // updateBadges(), which fires the onUpdate callback (main.ts's
+    // updateAgentStatusBar) — main.ts calls `new AgentMonitor(...)` as
+    // `const agents = new AgentMonitor(...)`, so invoking that callback
+    // synchronously from inside this constructor reads `agents` before its
+    // own assignment finishes (a TDZ crash). Nothing has panes/tabs to badge
+    // yet at construction time anyway; the first real updateBadges() comes
+    // from the load()/poll below, safely after construction returns.
+    this.titleText.textContent = t("agents.title");
+    this.closeHint.textContent = t("agents.closeHint");
+    this.note.textContent = t("agents.note");
     void this.load();
     this.schedulePoll(PANE_POLL_CLOSED_MS);
 
     // Lives for the app's lifetime (a top-level singleton, see main.ts), so
     // this subscription is never unsubscribed — same as command-manager.ts.
     onLocaleChange(() => this.retranslate());
-    this.retranslate();
   }
 
   private retranslate() {
