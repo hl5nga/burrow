@@ -88,6 +88,7 @@ fn every_kind_round_trips_through_get_and_put() {
         "guardrails",
         "secrets-patterns",
         "keybindings",
+        "tasks",
     ] {
         let value = store.get_json(kind).unwrap();
         store.put_json(kind, value.clone()).unwrap();

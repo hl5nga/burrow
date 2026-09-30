@@ -526,3 +526,84 @@ impl Default for KeybindingsFile {
 impl StoreFile for KeybindingsFile {
     const FILE_NAME: &'static str = "keybindings.json";
 }
+
+// ---------- tasks.json ----------
+
+/// A project the task list is grouped by, tied to the tmux session whose
+/// agents its tasks are assigned to.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TaskProject {
+    pub id: String,
+    pub name: String,
+    /// The SSH profile (host) the agents run on.
+    pub profile_id: Option<String>,
+    /// Limits the assign targets to this tmux session.
+    pub tmux_session: Option<String>,
+    /// Prompt sent on Assign; `{title}`, `{description}` and `{doc}` are filled
+    /// in. Empty = the built-in wording.
+    pub template: String,
+}
+
+/// One time a task was sent to an agent.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TaskAssignment {
+    /// tmux `%N` id of the pane it went to.
+    pub pane_id: String,
+    /// "session › window" as the dashboard labels it.
+    pub label: String,
+    /// Unix milliseconds.
+    pub at: u64,
+    /// Exactly what was sent.
+    pub text: String,
+    /// Enter was sent too (false = pasted only).
+    pub submitted: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Task {
+    pub id: String,
+    pub project_id: String,
+    pub title: String,
+    /// Markdown.
+    pub description: String,
+    /// `todo` | `doing` | `review` | `done` | `hold`.
+    pub status: String,
+    /// `high` | `normal` | `low`.
+    pub priority: String,
+    /// Which agent should do it (be, fe, qa …); picks the default assign target.
+    pub role: String,
+    /// A task document in the project (e.g. docs/1_task/…md) the agent is told to read.
+    pub doc_path: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub assignments: Vec<TaskAssignment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TasksFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub projects: Vec<TaskProject>,
+    pub tasks: Vec<Task>,
+    /// The project last shown in the panel.
+    pub selected_project: Option<String>,
+}
+
+impl Default for TasksFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            projects: Vec::new(),
+            tasks: Vec::new(),
+            selected_project: None,
+        }
+    }
+}
+
+impl StoreFile for TasksFile {
+    const FILE_NAME: &'static str = "tasks.json";
+}

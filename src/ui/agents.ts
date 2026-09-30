@@ -50,6 +50,19 @@ interface PaneAgent {
   since: number;
 }
 
+/** A tmux pane a task can be sent to, with what is known about it right now. */
+export interface AssignTarget {
+  paneId: string;
+  /** tmux window name (cpo, be, fe …). */
+  windowName: string;
+  session: string;
+  /** "none": not a recognised AI agent (a plain shell, say). */
+  state: AgentState | "none";
+  toolLabel?: string;
+  /** The agent runs with permission prompts off. */
+  bypass: boolean;
+}
+
 type TmuxPanes = { state: "panes"; panes: Pane[] } | { state: "none" };
 
 const SCAN_DEBOUNCE_MS = 300;
@@ -96,6 +109,7 @@ export class AgentMonitor implements TabObserver {
   private readonly note = document.createElement("div");
   private tick = 0;
   private pollTimer = 0;
+  private readonly updateListeners: (() => void)[] = [];
 
   constructor(
     private readonly sshTabs: () => { profileId: string; tab: TabRef }[],
@@ -395,6 +409,43 @@ export class AgentMonitor implements TabObserver {
       );
     }
     this.onUpdate();
+    for (const fn of this.updateListeners) fn();
+  }
+
+  /** Runs after every pane update (same moments as the status bar refreshes). */
+  addUpdateListener(fn: () => void) {
+    this.updateListeners.push(fn);
+  }
+
+  /** The state the last poll saw for a pane; undefined if it isn't a known agent. */
+  stateOf(profileId: string, paneId: string): AgentState | undefined {
+    return this.panes.get(`${profileId} ${paneId}`)?.state;
+  }
+
+  /**
+   * Panes of the profile's host, read fresh (not from the last poll), for the
+   * Assign dialog: what a task is about to be sent to must be current.
+   */
+  async targetsFor(profileId: string, session?: string | null): Promise<AssignTarget[]> {
+    const result = await invoke<TmuxPanes>("tmux_panes", { profileId });
+    if (result.state !== "panes") return [];
+    return result.panes
+      .filter((p) => !session || p.session === session)
+      .sort(
+        (x, y) => x.session.localeCompare(y.session) || x.window - y.window || x.index - y.index,
+      )
+      .map((pane) => {
+        const screen = pane.screen.split("\n").slice(-SCAN_LINES).join("\n");
+        const tool = this.classifier.toolForCommand(pane.command) ?? this.classifier.detect(screen);
+        return {
+          paneId: pane.id,
+          windowName: paneLabel(pane),
+          session: pane.session,
+          state: tool ? this.classifier.classify(tool, screen) : "none",
+          toolLabel: tool ? this.classifier.label(tool) : undefined,
+          bypass: /bypass permissions on/.test(screen),
+        };
+      });
   }
 
   /**
@@ -419,6 +470,18 @@ export class AgentMonitor implements TabObserver {
     }
     const agent = [...this.agents.values()].find((a) => a.tab.isActive());
     return agent ? [{ label: this.classifier.label(agent.tool), state: agent.state }] : [];
+  }
+
+  /** An OS notification for something the user should know while Burrow is in the background. */
+  async notifyText(title: string, body: string) {
+    if (document.hasFocus()) return;
+    try {
+      let granted = await isPermissionGranted();
+      if (!granted) granted = (await requestPermission()) === "granted";
+      if (granted) sendNotification({ title, body });
+    } catch {
+      // Notifications are a convenience; the toast and the row banner still show.
+    }
   }
 
   /** Only when the user can't already see it: another tab, or Burrow in the background. */

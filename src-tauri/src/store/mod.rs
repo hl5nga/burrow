@@ -211,6 +211,7 @@ impl Store {
             "guardrails" => serde_json::to_value(self.load::<GuardrailsFile>()),
             "secrets-patterns" => serde_json::to_value(self.load::<SecretsPatternsFile>()),
             "keybindings" => serde_json::to_value(self.load::<KeybindingsFile>()),
+            "tasks" => serde_json::to_value(self.load::<TasksFile>()),
             _ => return Err(format!("unknown store file: {kind}")),
         };
         value.map_err(|e| e.to_string())
@@ -234,6 +235,7 @@ impl Store {
             "guardrails" => put::<GuardrailsFile>(self, value),
             "secrets-patterns" => put::<SecretsPatternsFile>(self, value),
             "keybindings" => put::<KeybindingsFile>(self, value),
+            "tasks" => put::<TasksFile>(self, value),
             _ => Err(format!("unknown store file: {kind}")),
         }
     }

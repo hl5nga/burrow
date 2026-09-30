@@ -15,6 +15,7 @@ import { connectProfile } from "./ui/connect";
 import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
 import { UsageMonitor } from "./ui/usage-chip";
+import { TaskPanel } from "./ui/task-panel";
 import { AgentMonitor } from "./ui/agents";
 import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
@@ -37,6 +38,7 @@ import "./styles/agents.css";
 import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
+import "./styles/tasks.css";
 import "./styles/command-manager.css";
 import "./styles/blocks.css";
 import "./styles/hud.css";
@@ -139,6 +141,7 @@ const tabs = new TabManager(
     },
     onActiveConnection: (connection) => {
       showConnection(connection);
+      taskPanel.followProfile(connection?.profileId);
       resources.activeChanged();
       usage.activeChanged();
       updateAgentStatusBar();
@@ -223,6 +226,10 @@ const agents = new AgentMonitor(() => tabs.sshTabs(), updateAgentStatusBar);
 tabs.observe(agents);
 tabs.observe(new GuardrailPrompt());
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
+const activeProfileId = () => tabs.sshTabs().find((x) => x.tab.isActive())?.profileId;
+const taskPanel = new TaskPanel(agents, activeProfileId);
+frequent.attachTasks(taskPanel);
+if (import.meta.env.DEV) devBag.taskPanel = taskPanel;
 
 const inTerminal = (e: Event) =>
   !!app.querySelector(".term-body")?.contains(e.target as Node) &&

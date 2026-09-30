@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { TerminalSession } from "../terminal/session";
 import { t, onLocaleChange } from "../i18n";
+import type { TaskPanel } from "./task-panel";
 
 type Scope = "dir" | "host" | "all";
+type View = "commands" | "tasks";
+
+const VIEW_KEY = "burrow.panelView";
 
 interface Ranked {
   command: string;
@@ -44,6 +48,10 @@ export class FrequentPanel {
   private readonly titleText = el("span");
   private readonly hint = el("div", "scope-hint");
   private scope: Scope = "dir";
+  private view: View = "commands";
+  private readonly viewTabs = new Map<View, HTMLButtonElement>();
+  private head?: HTMLElement;
+  private tasks?: TaskPanel;
   private items: Ranked[] = [];
   private open = true;
   // What was on screen for the current scope/place, to spot newly promoted entries.
@@ -73,6 +81,7 @@ export class FrequentPanel {
       tabRow.append(tab);
     }
     head.append(titleRow, tabRow, this.hint);
+    this.head = head;
     this.element.append(head, this.list, this.foot);
     this.element.tabIndex = -1;
     this.element.addEventListener("keydown", (e) => this.onKey(e));
@@ -92,7 +101,51 @@ export class FrequentPanel {
     this.retranslate();
   }
 
+  /** Adds the "Tasks" view next to the commands, with a switch at the top. */
+  attachTasks(tasks: TaskPanel) {
+    this.tasks = tasks;
+    const switcher = el("div", "panel-views");
+    for (const view of ["commands", "tasks"] as View[]) {
+      const b = el("button", "panel-view");
+      b.addEventListener("click", () => this.setView(view, true));
+      this.viewTabs.set(view, b);
+      switcher.append(b);
+    }
+    this.element.prepend(switcher);
+    this.element.append(tasks.element);
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(VIEW_KEY);
+    } catch {
+      // Private window or blocked storage: start on commands.
+    }
+    this.retranslate();
+    this.setView(saved === "tasks" ? "tasks" : "commands", false);
+  }
+
+  private setView(view: View, focus: boolean) {
+    this.view = view;
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // Remembering the tab is a convenience only.
+    }
+    const commands = view === "commands";
+    if (this.head) this.head.hidden = !commands;
+    this.list.hidden = !commands;
+    this.foot.hidden = !commands;
+    if (this.tasks) this.tasks.element.hidden = commands;
+    for (const [v, b] of this.viewTabs) b.classList.toggle("active", v === view);
+    if (commands) void this.refresh();
+    else {
+      this.tasks?.shown();
+      if (focus) this.tasks?.element.querySelector<HTMLElement>(".task-add")?.focus();
+    }
+  }
+
   private retranslate() {
+    this.viewTabs.get("commands")?.replaceChildren(t("tasks.tabCommands"));
+    this.viewTabs.get("tasks")?.replaceChildren(t("tasks.tabTasks"));
     this.titleText.textContent = t("frequentPanel.title");
     this.hint.textContent = t("frequentPanel.footerHint");
     this.rail.title = t("frequentPanel.railTitle");
@@ -215,6 +268,14 @@ export class FrequentPanel {
   }
 
   private onKey(e: KeyboardEvent) {
+    // The Tasks view has text fields: digits and arrows are for typing there.
+    if (this.view === "tasks") {
+      if (e.key === "Escape" && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        this.getSession()?.focus();
+      }
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (/^[1-9]$/.test(e.key)) {
       e.preventDefault();
