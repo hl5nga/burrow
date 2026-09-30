@@ -161,3 +161,7 @@ All dependencies (Rust crates and npm packages, scanned via `cargo metadata`
 and `license-checker`) are MIT/Apache-2.0/BSD/MPL-2.0 or similarly permissive
 and compatible with GPL-3.0; none introduce a conflicting license
 obligation.
+
+---
+
+Built collaboratively with [Claude Code](https://claude.com/claude-code).
