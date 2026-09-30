@@ -149,6 +149,7 @@ const tabs = new TabManager(
       return true;
     },
     onLastTabClosed: () => getCurrentWindow().close(),
+    onNewTabRequest: () => void viewStartup(),
   },
 );
 const activeSession = () => tabs.activeSession();
@@ -261,7 +262,7 @@ keys.register({
 keys.register({
   id: "new-tab",
   label: t("keybindings.actions.newTab"),
-  run: () => void tabs.newTab(),
+  run: () => void viewStartup(),
 });
 keys.register({
   id: "close-tab",

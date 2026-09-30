@@ -85,6 +85,8 @@ export interface TabEvents {
    */
   confirmCloseLastTab(): Promise<boolean>;
   onLastTabClosed(): void;
+  /** The ＋ button: the app decides what a new tab is (usually a connection picker). */
+  onNewTabRequest(): void;
 }
 
 function basename(path: string): string {
@@ -110,7 +112,7 @@ export class TabManager {
     add.className = "tab-add";
     add.textContent = "＋";
     add.title = t("tabs.newTabTitle");
-    add.addEventListener("click", () => void this.newTab());
+    add.addEventListener("click", () => this.events.onNewTabRequest());
     this.bar.append(add);
   }
 
