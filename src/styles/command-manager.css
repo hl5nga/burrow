@@ -1,7 +1,8 @@
 .manager-overlay {
   position: fixed;
   inset: 0;
-  z-index: 850;
+  /* Above the launcher (950) so Edit opens over it, below dialogs (1000). */
+  z-index: 960;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -318,9 +318,8 @@ export class Launcher {
   private handleEdit(profile: StoredCommand) {
     if (!this.onEditProfile) return;
     window.clearInterval(this.pollTimer);
-    this.overlay.hidden = true;
+    // The launcher stays put underneath; the manager stacks above it.
     this.onEditProfile(profile, () => {
-      this.overlay.hidden = false;
       void this.load();
     });
   }
