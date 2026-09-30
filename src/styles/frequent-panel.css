@@ -14,6 +14,14 @@
   display: none;
 }
 
+/* These set display:flex below, which would beat the [hidden] attribute — the
+   Tasks view hides them, and they kept their space above it. */
+.freq-panel-head[hidden],
+.freq-list[hidden],
+.freq-panel-foot[hidden] {
+  display: none;
+}
+
 .freq-panel:focus-within .freq-panel-head h4 {
   color: var(--amber);
 }
