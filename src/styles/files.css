@@ -206,7 +206,8 @@
 }
 
 .viewer-md {
-  max-width: 760px;
+  max-width: 900px;
+  margin: 0 auto;
   padding: 20px 28px 40px;
   font-size: 14px;
   line-height: 1.7;
