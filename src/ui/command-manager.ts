@@ -344,7 +344,9 @@ export class CommandManager {
         (this.draft as unknown as Record<string, string>)[spec.key] = input.value;
       });
       field.append(label, input);
-      if (this.errors[spec.key]) field.append(el("div", "field-error", this.errors[spec.key]));
+      const errorKey = this.errors[spec.key];
+      if (errorKey)
+        field.append(el("div", "field-error", t(`commandManager.validation.${errorKey}`)));
       else if (spec.hint) field.append(el("div", "field-hint", spec.hint));
       this.form.append(field);
 

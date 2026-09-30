@@ -16,11 +16,14 @@ export function getLocale(): Locale {
 
 /** Switches the dictionary in place and notifies every subscriber to
  * re-render — no restart needed. Does not persist; call saveLocale() too
- * (the language chip does both together). */
+ * (the language chip does both together). Also rebuilds the native macOS
+ * menu bar (src-tauri/src/menu.rs), which the frontend's `t()` can't reach —
+ * best-effort: a menu rebuild failing is not worth surfacing to the user. */
 export function setLocale(next: Locale) {
   if (locale === next) return;
   locale = next;
   listeners.forEach((fn) => fn());
+  void invoke("set_menu_locale", { locale: next }).catch(() => {});
 }
 
 /** A component subscribes here and re-renders itself on change (see

@@ -23,7 +23,15 @@ export interface StoredCommand {
   homeNetworks: HomeNetwork[];
 }
 
-export type FieldErrors = Partial<Record<keyof StoredCommand, string>>;
+/**
+ * Keys into i18n's `commandManager.validation.*` — kept as plain keys (not
+ * translated text) so this module never needs to import "../i18n" itself;
+ * the caller (command-manager.ts) does the t() lookup for display.
+ */
+export type ValidationKey =
+  "commandRequired" | "nameRequired" | "hostRequired" | "hostFormat" | "tmuxFormat";
+
+export type FieldErrors = Partial<Record<keyof StoredCommand, ValidationKey>>;
 
 // [user@]host with an optional :port; host may be an ssh_config alias, a DNS name
 // or an IPv4 address. A leading "-" would reach ssh as an option (e.g.
@@ -35,16 +43,14 @@ const TMUX_SESSION = /^[A-Za-z0-9_-]{1,64}$/;
 export function validateCommand(c: StoredCommand): FieldErrors {
   const errors: FieldErrors = {};
   if (c.type === "shell") {
-    if (!c.command.trim()) errors.command = "실행할 명령을 입력하세요";
+    if (!c.command.trim()) errors.command = "commandRequired";
   } else {
-    if (!c.name.trim()) errors.name = "프로필 이름을 입력하세요";
+    if (!c.name.trim()) errors.name = "nameRequired";
     const host = c.sshHost?.trim() ?? "";
-    if (!host) errors.sshHost = "접속할 호스트를 입력하세요";
-    else if (!SSH_HOST.test(host))
-      errors.sshHost = "user@host, 호스트 별칭, host:port 형식만 가능합니다 (공백·'-'로 시작 불가)";
+    if (!host) errors.sshHost = "hostRequired";
+    else if (!SSH_HOST.test(host)) errors.sshHost = "hostFormat";
     const session = c.tmuxSession?.trim() ?? "";
-    if (session && !TMUX_SESSION.test(session))
-      errors.tmuxSession = "영문·숫자·'-'·'_'만 쓸 수 있습니다 (최대 64자)";
+    if (session && !TMUX_SESSION.test(session)) errors.tmuxSession = "tmuxFormat";
   }
   return errors;
 }

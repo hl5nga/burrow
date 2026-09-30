@@ -2,16 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface ThemeDef {
   id: string;
-  label: string;
 }
 
-/** Order shown in the theme menu; "dark" is first since it's the default. */
+/** Order shown in the theme menu; "dark" is first since it's the default.
+ * Labels live in i18n (themeChip.themes.<id>) since they're user-facing. */
 export const THEMES: ThemeDef[] = [
-  { id: "dark", label: "다크" },
-  { id: "light", label: "화이트" },
-  { id: "sky", label: "라이트 블루" },
-  { id: "paper", label: "페이퍼" },
-  { id: "mono", label: "모노크롬" },
+  { id: "dark" },
+  { id: "light" },
+  { id: "sky" },
+  { id: "paper" },
+  { id: "mono" },
 ];
 
 export const DEFAULT_THEME = "dark";

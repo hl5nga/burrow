@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { TerminalSession } from "../terminal/session";
 import { fuzzyScore } from "./fuzzy";
+import { t, onLocaleChange } from "../i18n";
 
 import type { StoredCommand } from "./command-validation";
 
@@ -49,9 +50,12 @@ export class CommandPalette {
   private readonly input = el("input");
   private readonly results = el("div", "palette-results");
   private readonly footerNote = el("span", "palette-note");
+  private readonly escHint = el("span", "kbd");
+  private readonly footerHints: { key: string; label: HTMLElement }[] = [];
   private entries: Entry[] = [];
   private visible: Entry[] = [];
   private selected = 0;
+  private promotionThreshold = 0;
 
   constructor(
     private readonly getSession: () => TerminalSession | undefined,
@@ -60,20 +64,17 @@ export class CommandPalette {
   ) {
     const box = el("div", "palette");
     const search = el("div", "palette-search");
-    this.input.placeholder = "명령어 검색 — 초성(ㅂㅍ)도 됩니다";
     this.input.spellcheck = false;
     this.input.autocomplete = "off";
-    search.append(el("span", "glyph", "❯"), this.input, el("span", "kbd", "esc 닫기"));
+    search.append(el("span", "glyph", "❯"), this.input, this.escHint);
 
     const footer = el("div", "palette-footer");
-    for (const [key, label] of [
-      ["↑↓", "이동"],
-      ["↵", "실행"],
-      ["⌘E", "편집"],
-    ]) {
+    for (const key of ["↑↓", "↵", "⌘E"]) {
+      const label = el("span");
       const hint = el("span");
       hint.append(el("b", undefined, key), label);
       footer.append(hint);
+      this.footerHints.push({ key, label });
     }
     footer.append(this.footerNote);
 
@@ -90,6 +91,23 @@ export class CommandPalette {
       this.render();
     });
     this.input.addEventListener("keydown", (e) => this.onKey(e));
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.input.placeholder = t("palette.searchPlaceholder");
+    this.escHint.textContent = t("palette.escToClose");
+    const hintKeys = ["palette.moveHint", "palette.runHint", "palette.editHint"];
+    this.footerHints.forEach(({ label }, i) => (label.textContent = t(hintKeys[i])));
+    if (this.promotionThreshold)
+      this.footerNote.textContent = t("palette.autoPromoteHint", {
+        threshold: String(this.promotionThreshold),
+      });
+    if (this.isOpen) this.render();
   }
 
   get isOpen(): boolean {
@@ -125,11 +143,14 @@ export class CommandPalette {
       invoke<Ranked[]>("stats_top", { host, cwd, scope: "dir", limit: FREQUENT_LIMIT }),
       invoke<Ranked[]>("stats_top", { host, cwd, scope: "host", limit: FREQUENT_LIMIT * 2 }),
     ]);
-    this.footerNote.textContent = `${config.promotionThreshold}회 이상 쓴 명령이 자동으로 올라옵니다`;
+    this.promotionThreshold = config.promotionThreshold;
+    this.footerNote.textContent = t("palette.autoPromoteHint", {
+      threshold: String(config.promotionThreshold),
+    });
 
     const registered: Entry[] = commandsFile.commands.map((c) => ({
       commandId: c.id,
-      section: "사용자 등록 명령어",
+      section: t("palette.userCommandsSection"),
       title: c.name || c.command,
       subtitle: c.type === "ssh-profile" ? (c.sshHost ?? "") : c.command,
       run: c.command,
@@ -149,8 +170,9 @@ export class CommandPalette {
       count: r.count,
       searchable: [r.command],
     });
-    const hereSection = `여기서 자주 씀 · ${basename(cwd)}`;
-    const hostSection = host === "local" ? "로컬에서 자주 씀" : `이 서버에서 자주 씀 · ${host}`;
+    const hereSection = t("palette.hereSection", { folder: basename(cwd) });
+    const hostSection =
+      host === "local" ? t("palette.hostLocalSection") : t("palette.hostRemoteSection", { host });
     const inHere = new Set(here.map((r) => r.command));
     return [
       ...registered,
@@ -189,9 +211,7 @@ export class CommandPalette {
     this.results.replaceChildren();
 
     if (this.visible.length === 0) {
-      const empty = this.input.value.trim()
-        ? "일치하는 명령어가 없습니다"
-        : "아직 등록된 명령어도, 자주 쓴 명령어도 없습니다";
+      const empty = this.input.value.trim() ? t("palette.noMatches") : t("palette.emptyAll");
       this.results.append(el("div", "palette-empty", empty));
       return;
     }
@@ -215,7 +235,8 @@ export class CommandPalette {
       main.append(el("div", entry.titleIsCommand ? "p-name mono" : "p-name", entry.title));
       if (entry.subtitle) main.append(el("div", "p-cmd", entry.subtitle));
       row.append(el("div", `p-icon ${entry.icon === "SSH" ? "ssh" : "shell"}`, entry.icon), main);
-      if (entry.count !== undefined) row.append(el("div", "p-count", `${entry.count}회`));
+      if (entry.count !== undefined)
+        row.append(el("div", "p-count", t("palette.countSuffix", { count: String(entry.count) })));
       row.addEventListener("mousemove", () => this.select(index));
       row.addEventListener("click", () => this.runSelected());
       current.append(row);

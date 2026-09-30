@@ -114,6 +114,10 @@ export class Launcher {
      * one-time startup gate, which has nothing to cancel back to.
      */
     private readonly dismissible = false,
+    /** Edit-icon click on an SSH row: hides the list, opens the profile in
+     * the command manager, and calls back once it's closed so the list can
+     * reload (the name/host shown may have changed). */
+    private readonly onEditProfile?: (profile: StoredCommand, onDone: () => void) => void,
   ) {
     const box = el("div", "launcher");
     const head = el("div", "launcher-head");
@@ -268,7 +272,18 @@ export class Launcher {
       this.resolveEntry?.(entry);
     });
 
-    row.append(icon(entry), dot, main, auto, connect);
+    let edit: HTMLButtonElement | undefined;
+    if (isSsh) {
+      edit = el("button", "launcher-edit", "✎");
+      edit.type = "button";
+      edit.title = t("launcher.edit");
+      edit.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleEdit(entry.profile);
+      });
+    }
+
+    row.append(icon(entry), dot, main, ...(edit ? [edit] : []), auto, connect);
     row.addEventListener("click", () => this.resolveEntry?.(entry));
 
     if (isSsh) {
@@ -279,6 +294,16 @@ export class Launcher {
       dot.className = "launcher-dot online";
     }
     return row;
+  }
+
+  private handleEdit(profile: StoredCommand) {
+    if (!this.onEditProfile) return;
+    window.clearInterval(this.pollTimer);
+    this.overlay.hidden = true;
+    this.onEditProfile(profile, () => {
+      this.overlay.hidden = false;
+      void this.load();
+    });
   }
 
   private async setAutoOpen(id: string | null) {

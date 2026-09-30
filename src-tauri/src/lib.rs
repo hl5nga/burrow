@@ -68,6 +68,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
         confirm_exit,
+        menu::set_menu_locale,
         devctl::dev_log,
     ]
 }
@@ -109,6 +110,7 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         remote::remote_install_hooks,
         remote::pty_spawn_ssh,
         confirm_exit,
+        menu::set_menu_locale,
     ]
 }
 

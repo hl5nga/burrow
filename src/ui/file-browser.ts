@@ -4,6 +4,7 @@ import { highlight, htmlFrame, jsonTree, languageFor, renderMarkdown } from "./d
 import type { ActiveTarget } from "./guardrail-manager";
 import type { TerminalSession } from "../terminal/session";
 import { showToast } from "./toast";
+import { t, onLocaleChange } from "../i18n";
 
 interface Entry {
   name: string;
@@ -57,6 +58,9 @@ export class FileBrowser {
   private readonly list = el("div", "files-list");
   private readonly hiddenToggle = el("input");
   private readonly viewer = el("div", "viewer-overlay");
+  private readonly titleText = el("span", "files-title");
+  private readonly hiddenLabelText = document.createTextNode("");
+  private readonly note = el("div", "files-note");
   private target?: ActiveTarget;
   private path = "";
   /** The folder the shell reported last; the panel follows it on change. */
@@ -68,18 +72,13 @@ export class FileBrowser {
     private readonly active: () => { target?: ActiveTarget; session?: TerminalSession },
   ) {
     const head = el("div", "files-head");
-    head.append(el("span", "files-title", "파일"));
+    head.append(this.titleText);
     const hidden = el("label", "files-hidden");
     this.hiddenToggle.type = "checkbox";
     this.hiddenToggle.addEventListener("change", () => void this.load());
-    hidden.append(this.hiddenToggle, document.createTextNode(" 숨김 파일"));
+    hidden.append(this.hiddenToggle, this.hiddenLabelText);
     head.append(hidden);
-    this.panel.append(
-      head,
-      this.crumbs,
-      this.list,
-      el("div", "files-note", "읽기 전용 — 수정은 편집기에서"),
-    );
+    this.panel.append(head, this.crumbs, this.list, this.note);
     this.panel.hidden = true;
     workspace.prepend(this.panel);
     this.viewer.hidden = true;
@@ -95,6 +94,17 @@ export class FileBrowser {
       }
     });
     this.viewer.tabIndex = -1;
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.titleText.textContent = t("fileBrowser.title");
+    this.hiddenLabelText.textContent = t("fileBrowser.hiddenFiles");
+    this.note.textContent = t("fileBrowser.readOnlyNote");
   }
 
   get isOpen() {
@@ -125,14 +135,12 @@ export class FileBrowser {
       // of waiting for an event that may never come.
       return this.locateRemoteCwd(target.profileId);
     }
-    this.showMessage(
-      "현재 폴더를 아직 모릅니다 — 훅이 있는 셸에서 명령을 한 번 실행하면 나타납니다",
-    );
+    this.showMessage(t("fileBrowser.unknownCwd"));
   }
 
   private async locateRemoteCwd(profileId: string) {
     const id = ++this.request;
-    this.showMessage("원격 폴더를 확인하는 중…");
+    this.showMessage(t("fileBrowser.locatingRemote"));
     try {
       const cwd = await invoke<string>("remote_cwd", { profileId });
       if (id !== this.request || this.target?.profileId !== profileId) return;
@@ -156,13 +164,11 @@ export class FileBrowser {
     const target = this.target;
     if (!target || !this.path) return;
     if (target.foreignShell) {
-      return this.showMessage(
-        "직접 ssh로 들어간 셸이라 폴더를 볼 수 없습니다. SSH 프로필 탭에서 열어 주세요",
-      );
+      return this.showMessage(t("fileBrowser.foreignShell"));
     }
     const id = ++this.request;
     this.renderCrumbs();
-    this.list.replaceChildren(el("div", "files-empty", "불러오는 중…"));
+    this.list.replaceChildren(el("div", "files-empty", t("fileBrowser.loading")));
     try {
       const entries = await invoke<Entry[]>("fs_list", {
         profileId: target.profileId ?? null,
@@ -178,7 +184,8 @@ export class FileBrowser {
   private renderCrumbs() {
     const parts = this.path.split("/").filter(Boolean);
     const nodes: HTMLElement[] = [];
-    const host = this.target?.hostLabel === "이 Mac" ? "" : `${this.target?.hostLabel}:`;
+    const host =
+      this.target?.hostLabel === t("launcher.thisMac") ? "" : `${this.target?.hostLabel}:`;
     const root = el("button", "crumb", parts.length ? host || "/" : `${host}/`);
     root.addEventListener("click", () => this.navigate("/"));
     nodes.push(root);
@@ -216,7 +223,7 @@ export class FileBrowser {
       );
       rows.push(row);
     }
-    if (entries.length === 0) rows.push(el("div", "files-empty", "비어 있음"));
+    if (entries.length === 0) rows.push(el("div", "files-empty", t("fileBrowser.empty")));
     this.list.replaceChildren(...rows);
   }
 
@@ -235,7 +242,7 @@ export class FileBrowser {
     this.viewer.replaceChildren(box);
     this.viewer.hidden = false;
     this.viewer.focus();
-    body.append(el("div", "files-empty", "불러오는 중…"));
+    body.append(el("div", "files-empty", t("fileBrowser.loading")));
 
     const button = (label: string, run: () => void) => {
       const b = el("button", "btn ghost", label);
@@ -244,7 +251,7 @@ export class FileBrowser {
       actions.append(b);
       return b;
     };
-    button("경로를 터미널에", () => {
+    button(t("fileBrowser.pathToTerminal"), () => {
       const session = this.active().session;
       this.closeViewer();
       session?.paste(shellQuote(path));
@@ -255,7 +262,7 @@ export class FileBrowser {
       content = await invoke<FileContent>("fs_read", { profileId: target.profileId ?? null, path });
     } catch (err) {
       body.replaceChildren(el("div", "files-empty", String(err)));
-      button("닫기", () => this.closeViewer());
+      button(t("fileBrowser.close"), () => this.closeViewer());
       return;
     }
     if (content.kind !== "text") {
@@ -264,15 +271,18 @@ export class FileBrowser {
           "div",
           "files-empty",
           content.kind === "tooLarge"
-            ? `미리보기엔 너무 큽니다 (${size(content.size)}, 2 MB까지)`
-            : `바이너리 파일이라 미리보지 않습니다 (${size(content.size)})`,
+            ? t("fileBrowser.tooLarge", { size: size(content.size) })
+            : t("fileBrowser.binaryFile", { size: size(content.size) }),
         ),
       );
-      button("닫기", () => this.closeViewer());
+      button(t("fileBrowser.close"), () => this.closeViewer());
       return;
     }
     const text = content.text;
-    button("복사", () => void copyText(text).then(() => showToast("내용을 복사했습니다")));
+    button(
+      t("fileBrowser.copy"),
+      () => void copyText(text).then(() => showToast(t("fileBrowser.copied"))),
+    );
     const lower = name.toLowerCase();
     const source = () => {
       const pre = el("pre", "viewer-code hljs");
@@ -308,13 +318,13 @@ export class FileBrowser {
     let showingSource = false;
     const show = () => body.replaceChildren(showingSource ? source() : rendered());
     if (rendered !== source) {
-      const toggle = button("소스 보기", () => {
+      const toggle = button(t("fileBrowser.viewSource"), () => {
         showingSource = !showingSource;
-        toggle.textContent = showingSource ? "미리보기" : "소스 보기";
+        toggle.textContent = showingSource ? t("fileBrowser.preview") : t("fileBrowser.viewSource");
         show();
       });
     }
-    button("닫기", () => this.closeViewer());
+    button(t("fileBrowser.close"), () => this.closeViewer());
     show();
   }
 

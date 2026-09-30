@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { displayCombo, eventToCombo, normalizeCombo } from "../terminal/keys";
 import { showToast } from "./toast";
+import { t, onLocaleChange } from "../i18n";
 
 export interface Binding {
   action: string;
@@ -43,6 +44,9 @@ export class Keybindings {
   private byCombo = new Map<string, Binding>();
   private readonly overlay = el("div", "manager-overlay");
   private readonly list = el("div", "keys-list");
+  private readonly titleText = el("h3");
+  private readonly resetButton = el("button", "btn ghost");
+  private readonly altScreenNote = el("div", "field-hint");
   private recording?: { action: string; combo?: string; conflict?: Binding };
   private onClose: () => void = () => {};
 
@@ -50,23 +54,30 @@ export class Keybindings {
     window.addEventListener("keydown", (e) => this.onKey(e), true);
     const box = el("div", "manager keys-panel");
     const head = el("div", "mgmt-list-head");
-    head.append(el("h3", undefined, "단축키"));
-    const reset = el("button", "btn ghost", "모두 기본값으로");
-    reset.type = "button";
-    reset.addEventListener("click", () => void this.resetAll());
-    head.append(reset);
-    const note = el(
-      "div",
-      "field-hint",
-      "'전체 화면 앱에서 끔'을 켜면 vim·htop·less 같은 앱이 떠 있을 때 그 키를 앱에 그대로 넘깁니다.",
-    );
-    box.append(head, note, this.list, this.extras());
+    head.append(this.titleText);
+    this.resetButton.type = "button";
+    this.resetButton.addEventListener("click", () => void this.resetAll());
+    head.append(this.resetButton);
+    box.append(head, this.altScreenNote, this.list, this.extras());
     this.overlay.append(box);
     this.overlay.hidden = true;
     document.body.append(this.overlay);
     this.overlay.addEventListener("mousedown", (e) => {
       if (e.target === this.overlay) this.close();
     });
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.titleText.textContent = t("keybindings.panel.title");
+    this.resetButton.textContent = t("keybindings.panel.resetAll");
+    this.altScreenNote.textContent = t("keybindings.panel.altScreenNote");
+    this.render();
+    this.renderExtras();
   }
 
   register(action: Action) {
@@ -81,7 +92,7 @@ export class Keybindings {
       const known = new Set(file.bindings.map((b) => b.action));
       this.bindings = [...file.bindings, ...this.defaults.filter((d) => !known.has(d.action))];
     } catch (err) {
-      showToast(`단축키 설정을 읽지 못해 기본값을 씁니다: ${err}`);
+      showToast(t("keybindings.panel.loadFailed", { error: String(err) }));
       this.bindings = [...this.defaults];
     }
     this.index();
@@ -151,7 +162,7 @@ export class Keybindings {
     const combo = eventToCombo(e);
     if (!combo || !this.recording) return; // a modifier alone: keep waiting
     if (!e.metaKey && !e.ctrlKey && !e.altKey && !/^F\d+$/.test(e.code)) {
-      showToast("⌘·⌃·⌥ 중 하나와 같이 누르세요 (F키는 단독 가능)");
+      showToast(t("keybindings.panel.needModifier"));
       return;
     }
     const conflict = this.bindings.find(
@@ -180,7 +191,7 @@ export class Keybindings {
         value: { version: 1, bindings: this.bindings },
       });
     } catch (err) {
-      showToast(`저장하지 못했습니다: ${err}`);
+      showToast(t("keybindings.panel.saveFailed", { error: String(err) }));
     }
   }
 
@@ -201,13 +212,13 @@ export class Keybindings {
         rec
           ? rec.combo
             ? displayCombo(rec.combo)
-            : "키를 누르세요…"
+            : t("keybindings.panel.pressKey")
           : b?.keys
             ? displayCombo(b.keys)
-            : "없음",
+            : t("keybindings.panel.none"),
       );
       chip.type = "button";
-      chip.title = "눌러서 새 조합 입력 (esc 취소)";
+      chip.title = t("keybindings.panel.chipTitle");
       chip.addEventListener("click", () => {
         this.recording = { action: action.id };
         this.render();
@@ -222,8 +233,8 @@ export class Keybindings {
         else this.bindings.push({ action: action.id, keys: "", disableInAltScreen: box.checked });
         void this.save();
       });
-      alt.append(box, document.createTextNode(" 전체 화면 앱에서 끔"));
-      const reset = el("button", "keys-reset", "기본값");
+      alt.append(box, document.createTextNode(t("keybindings.panel.disableInAltScreen")));
+      const reset = el("button", "keys-reset", t("keybindings.panel.resetOne"));
       reset.type = "button";
       const def = this.defaults.find((d) => d.action === action.id);
       reset.disabled = !def || (b?.keys ?? "") === def.keys;
@@ -234,8 +245,8 @@ export class Keybindings {
       if (rec?.conflict) {
         const warn = el("div", "keys-conflict");
         const other = this.actions.get(rec.conflict.action)?.label ?? rec.conflict.action;
-        warn.append(document.createTextNode(`이미 '${other}'에 쓰는 조합입니다. `));
-        const take = el("button", "btn danger", "여기로 옮기기");
+        warn.append(document.createTextNode(t("keybindings.panel.conflict", { other })));
+        const take = el("button", "btn danger", t("keybindings.panel.takeOver"));
         take.type = "button";
         take.addEventListener("click", () => void this.assign(action.id, rec.combo!, rec.conflict));
         warn.append(take);
@@ -262,14 +273,14 @@ export class Keybindings {
 
   private renderExtras() {
     this.extrasBox.replaceChildren(
-      el("div", "gc-title", "기타"),
-      ...this.extraToggles.map((t) => {
+      el("div", "gc-title", t("keybindings.panel.other")),
+      ...this.extraToggles.map((toggle) => {
         const label = el("label", "check");
         const box = el("input");
         box.type = "checkbox";
-        box.checked = t.get();
-        box.addEventListener("change", () => t.set(box.checked));
-        label.append(box, document.createTextNode(` ${t.label}`));
+        box.checked = toggle.get();
+        box.addEventListener("change", () => toggle.set(box.checked));
+        label.append(box, document.createTextNode(` ${toggle.label}`));
         return label;
       }),
     );

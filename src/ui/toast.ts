@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t } from "../i18n";
 
 interface Recovery {
   file: string;
@@ -25,6 +26,6 @@ export async function showStoreRecoveries() {
   const recoveries = await invoke<Recovery[]>("store_take_recoveries");
   for (const r of recoveries) {
     const name = r.file.split("/").pop();
-    showToast(`${name} 파일을 읽을 수 없어 기본값으로 다시 만들었습니다. 원래 내용: ${r.backup}`);
+    showToast(t("toast.recoveredFile", { name: name ?? r.file, backup: r.backup }));
   }
 }

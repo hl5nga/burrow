@@ -13,6 +13,7 @@ import {
 import type { HookEvent } from "../terminal/hook-events";
 import type { StoredCommand } from "./command-validation";
 import type { TabObserver, TabRef } from "./tabs";
+import { t, onLocaleChange } from "../i18n";
 
 /** Tier 1: an agent seen on a tab's own screen. */
 interface TabAgent {
@@ -55,22 +56,20 @@ const SCAN_DEBOUNCE_MS = 300;
 const PANE_POLL_OPEN_MS = 5000;
 const PANE_POLL_CLOSED_MS = 15_000;
 
-const STATE_TEXT: Record<AgentState, string> = {
-  unknown: "알 수 없음",
-  working: "작업 중",
-  waiting: "승인 대기",
-  done: "완료",
-  error: "에러",
-};
+function stateText(state: AgentState): string {
+  return t(`agents.state.${state}`);
+}
 
 /** Which state a tab badge shows when several agents share a tab. */
 const URGENCY: AgentState[] = ["waiting", "error", "working", "done", "unknown"];
 
 function elapsed(since: number): string {
   const s = Math.floor((Date.now() - since) / 1000);
-  if (s < 60) return `${s}초`;
+  if (s < 60) return t("agents.elapsedSeconds", { s: String(s) });
   const m = Math.floor(s / 60);
-  return m < 60 ? `${m}분` : `${Math.floor(m / 60)}시간 ${m % 60}분`;
+  return m < 60
+    ? t("agents.elapsedMinutes", { m: String(m) })
+    : t("agents.elapsedHoursMinutes", { h: String(Math.floor(m / 60)), m: String(m % 60) });
 }
 
 /**
@@ -92,6 +91,9 @@ export class AgentMonitor implements TabObserver {
   private readonly scans = new Map<number, number>();
   private readonly overlay = document.createElement("div");
   private readonly list = document.createElement("div");
+  private readonly titleText = document.createElement("h3");
+  private readonly closeHint = document.createElement("span");
+  private readonly note = document.createElement("div");
   private tick = 0;
   private pollTimer = 0;
 
@@ -107,12 +109,10 @@ export class AgentMonitor implements TabObserver {
     box.className = "agents";
     const head = document.createElement("div");
     head.className = "agents-head";
-    head.innerHTML = `<h3>에이전트</h3><span class="kbd">⌘⇧A · esc 닫기</span>`;
-    const note = document.createElement("div");
-    note.className = "agents-note";
-    note.textContent =
-      "화면 문구로 추정한 상태입니다 — 문구는 ~/.burrow/agent-patterns.json에서 고칠 수 있습니다";
-    box.append(head, this.list, note);
+    this.closeHint.className = "kbd";
+    head.append(this.titleText, this.closeHint);
+    this.note.className = "agents-note";
+    box.append(head, this.list, this.note);
     this.overlay.append(box);
     this.overlay.addEventListener("mousedown", (e) => {
       if (e.target === this.overlay) this.close();
@@ -127,6 +127,19 @@ export class AgentMonitor implements TabObserver {
     document.body.append(this.overlay);
     void this.load();
     this.schedulePoll(PANE_POLL_CLOSED_MS);
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.titleText.textContent = t("agents.title");
+    this.closeHint.textContent = t("agents.closeHint");
+    this.note.textContent = t("agents.note");
+    this.updateBadges();
+    if (this.isOpen) this.render();
   }
 
   async load() {
@@ -366,7 +379,10 @@ export class AgentMonitor implements TabObserver {
       const top = URGENCY.find((u) => states.some((s) => s.state === u)) ?? "unknown";
       const count = states.filter((s) => s.state === top).length;
       const tool = this.classifier.label(states.find((s) => s.state === top)!.tool);
-      tab.setBadge(top, `${tool} · ${STATE_TEXT[top]}${count > 1 ? ` (${count}개)` : ""}`);
+      tab.setBadge(
+        top,
+        `${tool} · ${stateText(top)}${count > 1 ? t("agents.countSuffix", { count: String(count) }) : ""}`,
+      );
     }
     this.onUpdate();
   }
@@ -402,7 +418,8 @@ export class AgentMonitor implements TabObserver {
     try {
       let granted = await isPermissionGranted();
       if (!granted) granted = (await requestPermission()) === "granted";
-      if (granted) sendNotification({ title: `${tool} · 승인 대기`, body: where });
+      if (granted)
+        sendNotification({ title: t("agents.notifyWaitingTitle", { tool }), body: where });
     } catch {
       // Notifications unavailable; the tab badge still shows it.
     }
@@ -419,7 +436,7 @@ export class AgentMonitor implements TabObserver {
     row.className = "agent-row";
     const badge = document.createElement("span");
     badge.className = `agent-state ${state}`;
-    badge.textContent = STATE_TEXT[state];
+    badge.textContent = stateText(state);
     const main = document.createElement("span");
     main.className = "agent-main";
     const title = document.createElement("span");
@@ -465,10 +482,12 @@ export class AgentMonitor implements TabObserver {
         shownProfiles.add(p.profileId);
         const head = document.createElement("div");
         head.className = "agents-host";
-        head.textContent = ssh.find((t) => t.profileId === p.profileId)?.tab.label() ?? "원격";
+        head.textContent =
+          ssh.find((entry) => entry.profileId === p.profileId)?.tab.label() ??
+          t("tabs.remoteLabel");
         rows.push(head);
       }
-      const where = `${p.pane.session} › ${paneLabel(p.pane)}${p.pane.active ? " · 보이는 pane" : ""}`;
+      const where = `${p.pane.session} › ${paneLabel(p.pane)}${p.pane.active ? t("agents.visiblePaneSuffix") : ""}`;
       rows.push(
         this.row(
           p.state,
@@ -482,8 +501,7 @@ export class AgentMonitor implements TabObserver {
     if (rows.length === 0) {
       const empty = document.createElement("div");
       empty.className = "agents-empty";
-      empty.textContent =
-        "지금 도는 에이전트가 없습니다. claude·codex·gemini·aider를 실행하면 여기에 나타납니다. SSH 호스트의 tmux pane도 함께 봅니다.";
+      empty.textContent = t("agents.emptyDashboard");
       rows.push(empty);
     }
     this.list.replaceChildren(...rows);

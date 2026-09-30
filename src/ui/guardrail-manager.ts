@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { chooseDialog } from "./dialog";
 import { showToast } from "./toast";
+import { t, onLocaleChange } from "../i18n";
 
 interface Rule {
   id: string;
@@ -44,6 +45,13 @@ export class GuardrailManager {
   private readonly form = el("form", "mgmt-form");
   private readonly probe = el("input", "input mono");
   private readonly probeResult = el("div", "field-hint");
+  private readonly titleText = el("span");
+  private readonly title = el("h3");
+  private readonly addButton = el("button", "btn");
+  private readonly claudeTitle = el("div", "gc-title");
+  private readonly claudeHint = el("div", "field-hint");
+  private readonly claudeUserButton = el("button", "btn ghost");
+  private readonly claudeProjectButton = el("button", "btn ghost");
   private rules: Rule[] = [];
   private draft: Rule = blankRule();
   private error = "";
@@ -55,15 +63,12 @@ export class GuardrailManager {
     const box = el("div", "manager");
     const listPane = el("div", "mgmt-list");
     const head = el("div", "mgmt-list-head");
-    const title = el("h3", undefined, "가드레일 규칙");
-    title.append(this.count);
-    const add = el("button", "btn", "＋ 새 규칙");
-    add.type = "button";
-    add.addEventListener("click", () => this.edit(blankRule()));
-    head.append(title, add);
+    this.title.append(this.titleText, this.count);
+    this.addButton.type = "button";
+    this.addButton.addEventListener("click", () => this.edit(blankRule()));
+    head.append(this.title, this.addButton);
 
     const probeField = el("div", "field");
-    this.probe.placeholder = "명령을 입력해 보세요 — 걸리는 규칙이 표시됩니다";
     this.probe.spellcheck = false;
     this.probe.addEventListener("input", () => void this.test());
     probeField.append(this.probe, this.probeResult);
@@ -86,6 +91,24 @@ export class GuardrailManager {
       e.preventDefault();
       void this.save();
     });
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.titleText.textContent = t("guardrailManager.title");
+    this.addButton.textContent = t("guardrailManager.newRule");
+    this.probe.placeholder = t("guardrailManager.probePlaceholder");
+    this.claudeTitle.textContent = t("guardrailManager.claudeTitle");
+    this.claudeHint.textContent = t("guardrailManager.claudeHint");
+    this.claudeUserButton.textContent = t("guardrailManager.installUser");
+    this.claudeProjectButton.textContent = t("guardrailManager.installProject");
+    this.renderProbeResult();
+    this.renderList();
+    this.renderForm();
   }
 
   get isOpen() {
@@ -126,12 +149,21 @@ export class GuardrailManager {
     } catch {
       this.matched.clear();
     }
+    this.renderProbeResult();
+  }
+
+  private renderProbeResult() {
+    const command = this.probe.value;
     const hits = this.rules.filter((r) => this.matched.has(r.id));
     this.probeResult.textContent = !command.trim()
-      ? "패턴은 zsh =~ (POSIX 확장 정규식): \\s 대신 [[:space:]], (?i) 같은 PCRE 문법은 쓸 수 없습니다"
+      ? t("guardrailManager.probeHelp")
       : hits.length
-        ? `걸림: ${hits.map((r) => `${r.label}${r.enabled ? "" : " (꺼짐)"}`).join(", ")}`
-        : "걸리는 규칙 없음";
+        ? t("guardrailManager.probeHit", {
+            list: hits
+              .map((r) => `${r.label}${r.enabled ? "" : t("guardrailManager.disabledSuffix")}`)
+              .join(", "),
+          })
+        : t("guardrailManager.noHits");
     this.renderList();
   }
 
@@ -145,13 +177,16 @@ export class GuardrailManager {
         if (this.matched.has(r.id)) row.classList.add("hit");
         if (!r.enabled) row.classList.add("off");
         const main = el("div", "cr-main");
-        const name = el("div", "cr-name", r.label || "(이름 없음)");
-        if (this.invalid.has(r.id)) name.append(el("span", "cr-tag bad", "패턴 오류"));
+        const name = el("div", "cr-name", r.label || t("guardrailManager.unnamed"));
+        if (this.invalid.has(r.id))
+          name.append(el("span", "cr-tag bad", t("guardrailManager.patternError")));
         main.append(name, el("div", "cr-sub", r.pattern));
         const badge = el(
           "span",
           `type-badge ${r.severity}`,
-          r.severity === "block" ? "차단" : "경고",
+          r.severity === "block"
+            ? t("guardrailManager.severityBlock")
+            : t("guardrailManager.severityWarn"),
         );
         row.append(badge, main);
         row.addEventListener("click", () => this.edit(r));
@@ -164,12 +199,12 @@ export class GuardrailManager {
     const d = this.draft;
     const isNew = !d.id;
     this.form.replaceChildren(
-      el("h3", undefined, isNew ? "새 가드레일 규칙" : d.label || "규칙"),
       el(
-        "p",
-        "hint",
-        "Enter를 누른 순간 명령줄 전체를 이 패턴과 비교합니다. 사람이 친 명령·붙여넣기·팔레트 실행 모두 해당됩니다.",
+        "h3",
+        undefined,
+        isNew ? t("guardrailManager.newRuleTitle") : d.label || t("guardrailManager.untitledRule"),
       ),
+      el("p", "hint", t("guardrailManager.formHint")),
     );
     const text = (key: "label" | "pattern", label: string, placeholder: string, mono = false) => {
       const field = el("div", "field");
@@ -185,11 +220,11 @@ export class GuardrailManager {
       return field;
     };
     const severity = el("div", "field");
-    const sl = el("label", undefined, "심각도");
+    const sl = el("label", undefined, t("guardrailManager.severityLabel"));
     const toggle = el("div", "type-toggle");
     for (const [value, label] of [
-      ["block", "차단 — Enter 두 번"],
-      ["warn", "경고만"],
+      ["block", t("guardrailManager.severityBlockOption")],
+      ["warn", t("guardrailManager.severityWarnOption")],
     ] as const) {
       const opt = el("button", d.severity === value ? "opt active" : "opt", label);
       opt.type = "button";
@@ -205,21 +240,34 @@ export class GuardrailManager {
     box.type = "checkbox";
     box.checked = d.enabled;
     box.addEventListener("change", () => (this.draft.enabled = box.checked));
-    enabled.append(box, document.createTextNode(" 사용"));
+    enabled.append(box, document.createTextNode(t("guardrailManager.enabledLabel")));
 
     this.form.append(
-      text("label", "이름", "예: 운영 DB 삭제"),
-      text("pattern", "패턴", "예: psql.*prod.*DROP", true),
+      text(
+        "label",
+        t("guardrailManager.fields.label.label"),
+        t("guardrailManager.fields.label.placeholder"),
+      ),
+      text(
+        "pattern",
+        t("guardrailManager.fields.pattern.label"),
+        t("guardrailManager.fields.pattern.placeholder"),
+        true,
+      ),
       severity,
       enabled,
     );
     if (this.error) this.form.append(el("div", "field-error", this.error));
     const actions = el("div", "form-actions");
-    const save = el("button", "btn", isNew ? "추가" : "저장");
+    const save = el(
+      "button",
+      "btn",
+      isNew ? t("guardrailManager.add") : t("guardrailManager.save"),
+    );
     save.type = "submit";
     actions.append(save);
     if (!isNew) {
-      const del = el("button", "btn danger", "삭제");
+      const del = el("button", "btn danger", t("guardrailManager.delete"));
       del.type = "button";
       del.addEventListener("click", () => void this.remove());
       actions.append(del);
@@ -230,7 +278,7 @@ export class GuardrailManager {
   private async save() {
     const d = { ...this.draft, label: this.draft.label.trim(), pattern: this.draft.pattern.trim() };
     if (!d.label || !d.pattern) {
-      this.error = "이름과 패턴을 모두 입력하세요";
+      this.error = t("guardrailManager.validationRequired");
       return this.renderForm();
     }
     const check = await invoke<{ invalid: string[] }>("guardrail_test", {
@@ -238,7 +286,7 @@ export class GuardrailManager {
       patterns: [["p", d.pattern]],
     });
     if (check.invalid.length) {
-      this.error = "zsh가 이 패턴을 해석하지 못합니다 (POSIX 확장 정규식인지 확인하세요)";
+      this.error = t("guardrailManager.invalidPattern");
       return this.renderForm();
     }
     if (!d.id) {
@@ -261,9 +309,9 @@ export class GuardrailManager {
   private async persist() {
     try {
       await invoke("store_put", { kind: "guardrails", value: { version: 1, rules: this.rules } });
-      showToast("가드레일을 저장했습니다 · 열린 셸은 다음 프롬프트부터 적용 (원격은 다음 접속 때)");
+      showToast(t("guardrailManager.saved"));
     } catch (err) {
-      showToast(`저장하지 못했습니다: ${err}`);
+      showToast(t("guardrailManager.saveFailed", { error: String(err) }));
     }
   }
 
@@ -271,21 +319,12 @@ export class GuardrailManager {
 
   private claudeSection(): HTMLElement {
     const section = el("div", "guard-claude");
-    section.append(
-      el("div", "gc-title", "Claude Code 연동"),
-      el(
-        "div",
-        "field-hint",
-        "에이전트는 셸 입력줄을 거치지 않고 명령을 실행해서 위 규칙이 닿지 않습니다. 같은 '차단' 규칙으로 Claude Code의 PreToolUse 훅을 설치하면 에이전트의 Bash 호출도 막습니다.",
-      ),
-    );
+    section.append(this.claudeTitle, this.claudeHint);
     const row = el("div", "form-actions");
-    const user = el("button", "btn ghost", "사용자 설정에 설치");
-    const project = el("button", "btn ghost", "현재 폴더 프로젝트에 설치");
-    user.type = project.type = "button";
-    user.addEventListener("click", () => void this.installClaude("user"));
-    project.addEventListener("click", () => void this.installClaude("project"));
-    row.append(user, project);
+    this.claudeUserButton.type = this.claudeProjectButton.type = "button";
+    this.claudeUserButton.addEventListener("click", () => void this.installClaude("user"));
+    this.claudeProjectButton.addEventListener("click", () => void this.installClaude("project"));
+    row.append(this.claudeUserButton, this.claudeProjectButton);
     section.append(row);
     return section;
   }
@@ -294,26 +333,24 @@ export class GuardrailManager {
     const target = this.activeTarget();
     if (!target) return;
     if (target.foreignShell) {
-      showToast(
-        "이 탭은 직접 ssh로 들어간 셸이라 설치할 곳을 알 수 없습니다. SSH 프로필 탭에서 해 주세요",
-      );
+      showToast(t("guardrailManager.foreignShellInstall"));
       return;
     }
     if (scope === "project" && !target.cwd) {
-      showToast("현재 폴더를 아직 모릅니다 (훅이 있는 셸에서 명령을 한 번 실행해 주세요)");
+      showToast(t("guardrailManager.unknownCwd"));
       return;
     }
     const file =
       scope === "user" ? "~/.claude/settings.json" : `${target.cwd}/.claude/settings.json`;
     const choice = await chooseDialog(
-      `${target.hostLabel}의 Claude Code에 가드레일 훅을 설치할까요?`,
+      t("guardrailManager.installConfirmTitle", { host: target.hostLabel }),
       [
-        `${file}의 hooks.PreToolUse에 Burrow 항목 하나를 추가합니다. 파일의 다른 설정은 그대로 두고, 바꾸기 전 내용은 settings.json.burrow-bak으로 남깁니다.`,
-        "훅 스크립트는 ~/.burrow/claude/guardrail-hook.zsh에 씁니다. '차단' 규칙에 걸리는 Bash 명령을 거부하고 이유를 에이전트에게 알려 줍니다.",
+        t("guardrailManager.installConfirmBody1", { file }),
+        t("guardrailManager.installConfirmBody2"),
       ],
       [
-        { value: "install", label: "설치" },
-        { value: "cancel", label: "취소", kind: "ghost" },
+        { value: "install", label: t("guardrailManager.install") },
+        { value: "cancel", label: t("guardrailManager.cancel"), kind: "ghost" },
       ],
     );
     if (choice !== "install") return;
@@ -326,11 +363,11 @@ export class GuardrailManager {
       });
       showToast(
         result.added
-          ? `설치했습니다: ${result.settings} · 실행 중인 Claude Code는 다시 시작해야 적용됩니다`
-          : `이미 설치돼 있어 규칙만 갱신했습니다: ${result.settings}`,
+          ? t("guardrailManager.installed", { settings: result.settings })
+          : t("guardrailManager.alreadyInstalled", { settings: result.settings }),
       );
     } catch (err) {
-      showToast(`설치하지 못했습니다: ${err}`);
+      showToast(t("guardrailManager.installFailed", { error: String(err) }));
     }
   }
 }

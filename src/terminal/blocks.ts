@@ -1,6 +1,7 @@
 import type { IDecoration, IMarker, Terminal } from "@xterm/xterm";
 import { copyText } from "../ui/clipboard";
 import { showToast } from "../ui/toast";
+import { t } from "../i18n";
 
 /**
  * Warp-style command blocks on top of xterm's grid, driven by the shell hooks:
@@ -148,13 +149,16 @@ export class BlockTracker {
       });
       actions.append(b);
     };
-    button("⧉", "출력 복사", () => void this.copy(this.outputText(block), "출력을 복사했습니다"));
-    button("↻", "다시 실행", () => this.actions.rerun(block.cmd));
+    button(
+      "⧉",
+      t("blocks.copyOutput"),
+      () => void this.copy(this.outputText(block), t("blocks.outputCopied")),
+    );
+    button("↻", t("blocks.rerun"), () => this.actions.rerun(block.cmd));
     button(
       "✦",
-      "AI 컨텍스트로 복사",
-      () =>
-        void this.copy(this.aiContext(block), "명령·출력을 AI에 붙여넣기 좋은 형태로 복사했습니다"),
+      t("blocks.copyAiContext"),
+      () => void this.copy(this.aiContext(block), t("blocks.aiContextCopied")),
     );
 
     const status = document.createElement("span");
@@ -185,7 +189,7 @@ export class BlockTracker {
   }
 
   private aiContext(block: Block): string {
-    const where = block.host === "local" ? "로컬" : block.host;
+    const where = block.host === "local" ? t("blocks.local") : block.host;
     const exit = block.exit === undefined ? "" : ` · exit ${block.exit}`;
     const output = this.outputText(block);
     return [
@@ -202,7 +206,7 @@ export class BlockTracker {
       await copyText(text);
       showToast(message, 2000);
     } catch (err) {
-      showToast(`복사하지 못했습니다: ${err}`);
+      showToast(t("blocks.copyFailed", { error: String(err) }));
     }
   }
 }

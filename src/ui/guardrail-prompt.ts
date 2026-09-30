@@ -2,6 +2,7 @@ import type { HookEvent } from "../terminal/hook-events";
 import { chooseDialog } from "./dialog";
 import type { TabObserver, TabRef } from "./tabs";
 import { showToast } from "./toast";
+import { t } from "../i18n";
 
 /**
  * The app side of the shell guardrail. The shell already holds the line and
@@ -19,11 +20,11 @@ export class GuardrailPrompt implements TabObserver {
       return;
     }
     if (event.severity === "warn") {
-      showToast(`⚠ 가드레일: ${event.label}`);
+      showToast(t("guardrailPrompt.warn", { label: event.label }));
       return;
     }
     if (!tab.isActive() || this.pending) {
-      showToast(`⛔ ${tab.label()}: ${event.label} — Enter를 한 번 더 눌러야 실행됩니다`);
+      showToast(t("guardrailPrompt.blockedBackground", { tab: tab.label(), label: event.label }));
       return;
     }
     void this.confirm(tab, event.cmd, event.label);
@@ -33,15 +34,12 @@ export class GuardrailPrompt implements TabObserver {
     const abort = new AbortController();
     this.pending = { tabId: tab.id, abort };
     const choice = await chooseDialog(
-      `위험할 수 있는 명령입니다 — ${label}`,
-      [
-        cmd,
-        "가드레일 규칙에 걸려 실행 전에 멈췄습니다. 여기서 Enter를 누르면 취소됩니다 — 실행하려면 '그래도 실행'을 누르세요.",
-      ],
+      t("guardrailPrompt.confirmTitle", { label }),
+      [cmd, t("guardrailPrompt.confirmBody")],
       // Cancel first: it takes the focus, so a stray Enter doesn't run it.
       [
-        { value: "cancel", label: "취소", kind: "ghost" },
-        { value: "run", label: "그래도 실행", kind: "danger" },
+        { value: "cancel", label: t("guardrailPrompt.cancel"), kind: "ghost" },
+        { value: "run", label: t("guardrailPrompt.runAnyway"), kind: "danger" },
       ],
       abort.signal,
     );

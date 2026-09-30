@@ -5,6 +5,7 @@ import { checkReachable } from "./reachability";
 import { showToast } from "./toast";
 import type { SessionTransport, TabManager } from "./tabs";
 import type { VpnChip } from "./vpn-chip";
+import { t } from "../i18n";
 
 type HookStatus =
   | { state: "current" | "outdated" | "missing" | "noZsh" }
@@ -28,15 +29,19 @@ const VPN_WAIT_MS = 30_000;
 async function bringUpVpn(
   profile: StoredCommand,
   vpn: VpnChip,
-  why: string,
+  reason: { kind: "notHome" } | { kind: "unreachable"; label: string },
   /** Off the home network an answer at a private address proves nothing, so wait for the tunnel itself. */
   waitForTunnel = false,
 ) {
-  showToast(`${why} VPN 명령을 실행합니다: ${profile.vpnPreConnect}`);
+  showToast(
+    reason.kind === "notHome"
+      ? t("connect.vpnNotHome", { command: profile.vpnPreConnect ?? "" })
+      : t("connect.vpnUnreachable", { label: reason.label, command: profile.vpnPreConnect ?? "" }),
+  );
   try {
     await invoke("vpn_pre_connect", { profileId: profile.id });
   } catch (err) {
-    showToast(`VPN 명령이 실패했습니다 (${err}). 그래도 접속을 시도합니다`);
+    showToast(t("connect.vpnCommandFailed", { error: String(err) }));
   }
   // Commands like `scutil --nc start` return before the tunnel is up.
   const deadline = Date.now() + VPN_WAIT_MS;
@@ -66,11 +71,11 @@ function chooseTransport(
   if (profile.transport === "ssh") return "ssh";
   if (profile.transport === "mosh") {
     if (!probe.localMosh) {
-      showToast("이 Mac에 mosh가 없어 SSH로 접속합니다 (brew install mosh)");
+      showToast(t("connect.noLocalMosh"));
       return "ssh";
     }
     if (reachable && !probe.moshServer) {
-      showToast(`${label}에 mosh-server가 없어 SSH로 접속합니다`);
+      showToast(t("connect.noRemoteMosh", { label }));
       return "ssh";
     }
     return "mosh";
@@ -79,9 +84,7 @@ function chooseTransport(
   if (probe.moshServer && probe.localMosh) return "mosh";
   if (probe.moshServer && !moshHintShown.has(profile.id)) {
     moshHintShown.add(profile.id);
-    showToast(
-      `${label}에 mosh-server가 있습니다. 이 Mac에도 mosh를 설치하면 (brew install mosh) 네트워크가 바뀌어도 세션이 유지됩니다`,
-    );
+    showToast(t("connect.moshAvailableHint", { label }));
   }
   return "ssh";
 }
@@ -109,16 +112,16 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
       const atHome = !!fp && homes.some((h) => h.gatewayMac === fp.gatewayMac);
       if (!atHome) {
         vpnEngaged = true;
-        reach = await bringUpVpn(profile, vpn, "집 네트워크가 아니라", true);
+        reach = await bringUpVpn(profile, vpn, { kind: "notHome" }, true);
       }
     } else if (reach.state !== "online") {
       // "unknown" (behind a proxy) could just as well need the VPN.
       vpnEngaged = true;
-      reach = await bringUpVpn(profile, vpn, `${label}에 닿지 않아`);
+      reach = await bringUpVpn(profile, vpn, { kind: "unreachable", label });
     }
   }
   if (reach.state === "offline") {
-    showToast(`${label} 오프라인 — ${reach.reason}`);
+    showToast(t("connect.offline", { label, reason: reach.reason }));
     return;
   }
 
@@ -126,7 +129,7 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
   try {
     probe = await invoke<RemoteProbe>("remote_probe", { profileId: profile.id });
   } catch (err) {
-    showToast(`${label}: ${err}`);
+    showToast(t("connect.probeFailed", { label, error: String(err) }));
     return;
   }
 
@@ -135,15 +138,22 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
   if (status.state === "missing" || status.state === "outdated") {
     const outdated = status.state === "outdated";
     const choice = await chooseDialog(
-      outdated ? `${label}의 Burrow 훅을 업데이트할까요?` : `${label}에 Burrow 훅을 설치할까요?`,
+      outdated
+        ? t("connect.hooksUpdateConfirm", { label })
+        : t("connect.hooksInstallConfirm", { label }),
       [
-        `원격의 ~/.burrow/shell/zsh 폴더에만 파일 5개를 ${outdated ? "새 버전으로 덮어씁니다" : "씁니다"}. 원격의 ~/.zshrc 같은 dotfile은 수정하지 않습니다.`,
-        "훅이 있으면 이 서버에서 쓴 명령이 서버별·폴더별로 집계되고 명령 블록이 표시됩니다. 훅 없이도 접속은 됩니다.",
+        outdated ? t("connect.hooksInstallBody1Update") : t("connect.hooksInstallBody1New"),
+        t("connect.hooksInstallBody2"),
       ],
       [
-        { value: "install", label: outdated ? "업데이트하고 접속" : "설치하고 접속" },
-        { value: "plain", label: "훅 없이 접속", kind: "ghost" },
-        { value: "cancel", label: "취소", kind: "ghost" },
+        {
+          value: "install",
+          label: outdated
+            ? t("connect.hooksUpdateAndConnect")
+            : t("connect.hooksInstallAndConnect"),
+        },
+        { value: "plain", label: t("connect.connectPlain"), kind: "ghost" },
+        { value: "cancel", label: t("connect.cancel"), kind: "ghost" },
       ],
     );
     if (!choice || choice === "cancel") return;
@@ -152,23 +162,23 @@ export async function connectProfile(tabs: TabManager, profile: StoredCommand, v
         await invoke("remote_install_hooks", { profileId: profile.id });
         withHooks = true;
       } catch (err) {
-        showToast(`훅을 설치하지 못해 훅 없이 접속합니다: ${err}`);
+        showToast(t("connect.hooksInstallFailed", { error: String(err) }));
       }
     }
   } else if (status.state === "noZsh") {
-    showToast(`${label}에 zsh가 없어 명령 추적 없이 접속합니다`);
+    showToast(t("connect.noZsh", { label }));
   } else if (status.state === "unreachable") {
     // Often a password-only login, which the non-interactive check cannot do.
-    showToast(`${label} 상태를 미리 확인하지 못했습니다 (${status.reason}). 훅 없이 접속합니다`);
+    showToast(t("connect.unreachableProbe", { label, reason: status.reason }));
   }
 
   if (profile.tmuxSession && status.state !== "unreachable" && !probe.tmux) {
-    showToast(`${label}에 tmux가 없어 일반 셸로 접속합니다`);
+    showToast(t("connect.noTmux", { label }));
   }
   if (withHooks) {
     // The host's copy of the guardrail rules follows this Mac's.
     await invoke("remote_sync_guardrails", { profileId: profile.id }).catch((err) =>
-      showToast(`원격 가드레일 규칙을 맞추지 못했습니다: ${err}`),
+      showToast(t("connect.guardrailSyncFailed", { error: String(err) })),
     );
   }
   const transport = chooseTransport(profile, probe, label);

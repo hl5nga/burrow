@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { joinLines, preparePaste } from "../terminal/paste";
 import type { TerminalSession } from "../terminal/session";
 import { chooseDialog } from "./dialog";
+import { t } from "../i18n";
 
 const PREVIEW_LINES = 8;
 const PIPE_PRESET = "preset-pipe-to-shell";
@@ -51,22 +52,24 @@ export async function guardPaste(session: TerminalSession, raw: string) {
   const more = paste.lines.length - PREVIEW_LINES;
   const count = paste.lines.filter((l) => l.trim()).length;
   const choice = await chooseDialog(
-    hits.length ? `위험할 수 있는 내용입니다 — ${hits.join(", ")}` : `${count}줄을 붙여넣을까요?`,
+    hits.length
+      ? t("pasteGuard.riskyTitle", { hits: hits.join(", ") })
+      : t("pasteGuard.confirmTitle", { count: String(count) }),
     [
-      { code: more > 0 ? `${shown}\n… 외 ${more}줄` : shown },
-      "여러 줄은 셸이 줄마다 명령으로 실행할 수 있습니다. 내용을 확인한 뒤 붙여넣으세요.",
+      { code: more > 0 ? t("pasteGuard.previewMore", { shown, more: String(more) }) : shown },
+      t("pasteGuard.multilineHint"),
     ],
     // With a warning, the focused (first) button is cancel.
     hits.length
       ? [
-          { value: "cancel", label: "취소", kind: "ghost" },
-          { value: "join", label: "한 줄로 붙여넣기", kind: "ghost" },
-          { value: "paste", label: "그래도 붙여넣기", kind: "danger" },
+          { value: "cancel", label: t("pasteGuard.cancel"), kind: "ghost" },
+          { value: "join", label: t("pasteGuard.pasteAsOneLine"), kind: "ghost" },
+          { value: "paste", label: t("pasteGuard.pasteAnyway"), kind: "danger" },
         ]
       : [
-          { value: "paste", label: "붙여넣기" },
-          { value: "join", label: "한 줄로 붙여넣기", kind: "ghost" },
-          { value: "cancel", label: "취소", kind: "ghost" },
+          { value: "paste", label: t("pasteGuard.paste") },
+          { value: "join", label: t("pasteGuard.pasteAsOneLine"), kind: "ghost" },
+          { value: "cancel", label: t("pasteGuard.cancel"), kind: "ghost" },
         ],
   );
   if (choice === "paste") session.paste(paste.text);

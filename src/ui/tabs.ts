@@ -10,6 +10,7 @@ import { showToast } from "./toast";
 import { checkReachable } from "./reachability";
 import { guardPaste } from "./paste-guard";
 import type { Level, ResourceTarget } from "./resource-chip";
+import { t } from "../i18n";
 
 export type SessionTransport = "ssh" | "mosh";
 
@@ -108,7 +109,7 @@ export class TabManager {
     const add = document.createElement("button");
     add.className = "tab-add";
     add.textContent = "＋";
-    add.title = "새 탭 (⌘T)";
+    add.title = t("tabs.newTabTitle");
     add.addEventListener("click", () => void this.newTab());
     this.bar.append(add);
   }
@@ -214,7 +215,7 @@ export class TabManager {
       window.setTimeout(() => (attempt = 0), 30_000);
       return id;
     } catch (err) {
-      if (attempt === 0) showToast(`Mosh 탭의 명령 추적을 시작하지 못했습니다: ${err}`);
+      if (attempt === 0) showToast(t("tabs.moshTrackingFailed", { error: String(err) }));
       channel.onmessage?.("burrow:stream-ended");
       return undefined;
     }
@@ -227,13 +228,11 @@ export class TabManager {
   private async pasteImage(tab: Tab) {
     if (!tab.connection && tab.context.host !== "local") {
       // ssh'd by hand from a local tab: Burrow can't reach that host.
-      showToast(
-        "직접 ssh로 들어간 셸이라 이미지를 올릴 수 없습니다. SSH 프로필 탭에서 붙여넣어 주세요",
-      );
+      showToast(t("tabs.pasteImageForeignShell"));
       return;
     }
-    const where = tab.connection ? (tab.title ?? "원격") : "이 Mac";
-    showToast(`이미지를 ${where}에 저장하는 중…`);
+    const where = tab.connection ? (tab.title ?? t("tabs.remoteLabel")) : t("launcher.thisMac");
+    showToast(t("tabs.pasteImageSaving", { where }));
     try {
       const path = await invoke<string>("clip_image_save", {
         profileId: tab.connection?.profileId ?? null,
@@ -242,7 +241,7 @@ export class TabManager {
       tab.session?.paste(path);
       tab.session?.focus();
     } catch (err) {
-      showToast(`이미지를 붙여넣지 못했습니다: ${err} — ⌘V로 다시 시도`);
+      showToast(t("tabs.pasteImageFailed", { error: String(err) }));
     }
   }
 
@@ -252,7 +251,7 @@ export class TabManager {
     if (!tab) return undefined;
     return {
       profileId: tab.connection?.profileId,
-      hostLabel: tab.connection ? (tab.title ?? tab.context.host) : "이 Mac",
+      hostLabel: tab.connection ? (tab.title ?? tab.context.host) : t("launcher.thisMac"),
       cwd: tab.context.cwd,
       foreignShell: !tab.connection && tab.context.host !== "local",
     };
@@ -281,7 +280,7 @@ export class TabManager {
   resourceTargets(): ResourceTarget[] {
     return this.tabs.map((tab) => ({
       profileId: tab.connection?.profileId,
-      label: tab.title ?? "이 Mac",
+      label: tab.title ?? t("launcher.thisMac"),
       active: tab === this.active,
       reachable: !tab.connection || tab.connection.state === "connected",
       setLevel: (value: Level | undefined) => {
@@ -293,9 +292,9 @@ export class TabManager {
         }
         dot.className = `res-dot ${value}`;
         dot.title = {
-          ok: "CPU·메모리 여유",
-          warn: "CPU·메모리 60% 이상",
-          high: "CPU·메모리 85% 이상",
+          ok: t("tabs.resourceOk"),
+          warn: t("tabs.resourceWarn"),
+          high: t("tabs.resourceHigh"),
         }[value];
       },
     }));
@@ -305,9 +304,9 @@ export class TabManager {
   networkChanged() {
     const connections = this.tabs.flatMap((t) => (t.connection ? [t.connection] : []));
     if (connections.some((c) => c.transport === "mosh")) {
-      showToast("네트워크가 바뀌었습니다 · Mosh 세션은 그대로 유지됩니다");
+      showToast(t("tabs.networkChangedMosh"));
     } else if (connections.some((c) => c.state === "connected")) {
-      showToast("네트워크가 바뀌었습니다 · SSH가 끊기면 자동으로 다시 연결합니다");
+      showToast(t("tabs.networkChangedSsh"));
     }
     for (const tab of this.tabs) {
       const c = tab.connection;
@@ -338,11 +337,11 @@ export class TabManager {
     element.className = "tab";
     const label = document.createElement("span");
     label.className = "tab-label";
-    label.textContent = spec.label ?? "로컬";
+    label.textContent = spec.label ?? t("tabs.localLabel");
     const close = document.createElement("span");
     close.className = "close";
     close.textContent = "×";
-    close.title = "탭 닫기 (⌘W)";
+    close.title = t("tabs.closeTabTitle");
     element.append(
       Object.assign(document.createElement("span"), { className: "dot" }),
       label,
@@ -416,7 +415,7 @@ export class TabManager {
       });
       this.setConnectionState(tab, "connected");
     } catch (err) {
-      showToast(`터미널을 시작하지 못했습니다: ${err}`);
+      showToast(t("tabs.startFailed", { error: String(err) }));
       this.close(tab);
     }
   }
@@ -466,9 +465,9 @@ export class TabManager {
     if (!profileId) return;
     try {
       await invoke("vpn_post_disconnect", { profileId });
-      showToast(`VPN 연결을 해제했습니다: ${tab.vpnDisconnectCmd}`);
+      showToast(t("tabs.vpnDisconnected", { cmd: tab.vpnDisconnectCmd ?? "" }));
     } catch (err) {
-      showToast(`VPN을 해제하지 못했습니다: ${err}`);
+      showToast(t("tabs.vpnDisconnectFailed", { error: String(err) }));
     }
   }
 
@@ -522,23 +521,20 @@ export class TabManager {
 
     if (!quick) c.everConnected = true;
     if (!dropped || !c.everConnected) {
-      session.notice(
-        `[연결하지 못했습니다${code !== null ? ` · 종료 코드 ${code}` : ""}] Enter: 다시 시도 · ⌘W: 탭 닫기`,
-      );
+      const codeSuffix = code !== null ? t("tabs.exitCodeSuffix", { code: String(code) }) : "";
+      session.notice(t("tabs.connectFailedNotice", { codeSuffix }));
       this.setConnectionState(tab, "stopped");
       return;
     }
     if (quick) c.quickFailures++;
     else c.quickFailures = 0;
     if (c.quickFailures >= MAX_QUICK_FAILURES) {
-      session.notice(
-        "[다시 연결하지 못했습니다 — 인증이나 호스트 설정을 확인하세요] Enter: 다시 시도 · ⌘W: 탭 닫기",
-      );
+      session.notice(t("tabs.reconnectFailedAuthNotice"));
       this.setConnectionState(tab, "stopped");
       return;
     }
     const delay = Math.min(2 ** c.attempt, MAX_BACKOFF_S);
-    session.notice(`[연결이 끊겼습니다 · ${delay}초 후 다시 연결합니다] Enter: 지금 연결`);
+    session.notice(t("tabs.droppedRetryNotice", { delay: String(delay) }));
     this.scheduleReconnect(tab, delay);
   }
 
@@ -562,14 +558,12 @@ export class TabManager {
     if (reach.state === "offline") {
       const delay = Math.min(2 ** c.attempt, MAX_BACKOFF_S);
       if (c.state !== "offline")
-        session.notice(
-          `[호스트에 닿지 않습니다 · ${reach.reason}] 계속 확인합니다 · Enter: 지금 확인`,
-        );
+        session.notice(t("tabs.unreachableRetryNotice", { reason: reach.reason }));
       this.setConnectionState(tab, "offline");
       c.timer = window.setTimeout(() => void this.reconnect(tab), delay * 1000);
       return;
     }
-    session.notice("[다시 연결하는 중…]");
+    session.notice(t("tabs.reconnectingNotice"));
     c.startedAt = Date.now();
     try {
       await session.restart();
@@ -580,7 +574,7 @@ export class TabManager {
         if (c.startedAt === started && c.state === "connected") c.attempt = 0;
       }, QUICK_EXIT_MS);
     } catch (err) {
-      session.notice(`[다시 연결하지 못했습니다: ${err}] Enter: 다시 시도`);
+      session.notice(t("tabs.reconnectErrorNotice", { error: String(err) }));
       this.setConnectionState(tab, "stopped");
     }
   }
@@ -596,7 +590,8 @@ export class TabManager {
   }
 
   private renderLabel(tab: Tab) {
-    const where = tab.title ?? (tab.context.host === "local" ? "로컬" : tab.context.host);
+    const where =
+      tab.title ?? (tab.context.host === "local" ? t("tabs.localLabel") : tab.context.host);
     tab.label.textContent = tab.context.cwd ? `${where} — ${basename(tab.context.cwd)}` : where;
     tab.element.title = tab.context.cwd;
   }
