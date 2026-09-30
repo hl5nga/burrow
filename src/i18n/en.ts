@@ -223,6 +223,25 @@ const en: Loose<typeof ko> = {
     memoryLabel: "Memory",
     cpuDetail: "{{cores}} cores · last 1s",
   },
+  usageChip: {
+    title: "Claude Code usage — 5-hour and weekly limits",
+    cardTitle: "Claude Code usage",
+    weekShort: "7d",
+    fiveHour: "5-hour limit",
+    weekly: "Weekly limit",
+    resetsIn: "resets in {{time}}",
+    notInstalled:
+      "Not set up on this host. Installing adds a status-line hook to Claude Code's settings.json (a backup is kept) so Burrow can read the usage numbers.",
+    noLimits:
+      "Claude Code reports no limits here (they only appear when signed in with a Pro/Max subscription).",
+    waiting: "Waiting for Claude Code's first reply on this host.",
+    stale: "Last updated {{min}} min ago.",
+    install: "Install",
+    remove: "Remove",
+    installed: "Usage display installed on {{label}}",
+    removed: "Usage display removed from {{label}}",
+    failed: "Usage setup failed: {{error}}",
+  },
   networkChip: {
     offlineLabel: "🌐 Offline",
     onlineTitle: "Internet connected",

@@ -13,6 +13,7 @@ mod resources;
 mod stats;
 mod store;
 mod tmux;
+mod usage;
 mod vpn;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -46,6 +47,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_top,
         clip::clip_image_save,
         clip::clip_text_write,
+        usage::usage_sample,
+        usage::usage_install,
+        usage::usage_uninstall,
         events::remote_event_stream,
         events::remote_event_stop,
         files::fs_list,
@@ -89,6 +93,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         stats::stats_top,
         clip::clip_image_save,
         clip::clip_text_write,
+        usage::usage_sample,
+        usage::usage_install,
+        usage::usage_uninstall,
         events::remote_event_stream,
         events::remote_event_stop,
         files::fs_list,

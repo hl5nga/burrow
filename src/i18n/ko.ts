@@ -214,6 +214,25 @@ export default {
     memoryLabel: "메모리",
     cpuDetail: "{{cores}}코어 · 최근 1초",
   },
+  usageChip: {
+    title: "Claude Code 사용량 — 5시간·주간 한도",
+    cardTitle: "Claude Code 사용량",
+    weekShort: "주간",
+    fiveHour: "5시간 한도",
+    weekly: "주간 한도",
+    resetsIn: "{{time}} 후 초기화",
+    notInstalled:
+      "이 호스트에는 아직 설정되지 않았습니다. 설치하면 Claude Code의 settings.json에 상태줄 훅이 추가되어(백업은 남깁니다) Burrow가 사용량을 읽을 수 있습니다.",
+    noLimits:
+      "여기서는 Claude Code가 한도 정보를 주지 않습니다 (Pro/Max 구독으로 로그인했을 때만 나옵니다).",
+    waiting: "이 호스트에서 Claude Code의 첫 응답을 기다리는 중입니다.",
+    stale: "{{min}}분 전에 갱신됐습니다.",
+    install: "설치",
+    remove: "제거",
+    installed: "{{label}}에 사용량 표시를 설치했습니다",
+    removed: "{{label}}의 사용량 표시를 제거했습니다",
+    failed: "사용량 설정 실패: {{error}}",
+  },
   networkChip: {
     offlineLabel: "🌐 오프라인",
     onlineTitle: "인터넷 연결됨",

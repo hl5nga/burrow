@@ -419,3 +419,29 @@
 .text-reset[hidden] {
   display: none;
 }
+
+/* Claude Code usage chip: "5h 23%  주간 41%" — the percentage carries the colour. */
+.usage-chip .rm-chip.ok {
+  color: var(--status-green);
+}
+
+.usage-chip .rm-chip.warn {
+  color: var(--status-orange);
+}
+
+.usage-chip .rm-chip.high {
+  color: var(--status-red);
+}
+
+.usage-card {
+  width: 240px;
+}
+
+.usage-note {
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.usage-action {
+  margin-top: 10px;
+}

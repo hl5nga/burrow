@@ -14,6 +14,7 @@ import { TabManager, type Connection } from "./ui/tabs";
 import { connectProfile } from "./ui/connect";
 import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
+import { UsageMonitor } from "./ui/usage-chip";
 import { AgentMonitor } from "./ui/agents";
 import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
@@ -128,6 +129,7 @@ const tabs = new TabManager(
       showContext(context);
       files.follow();
       resources.activeChanged();
+      usage.activeChanged();
       void frequent.refresh();
       updateAgentStatusBar();
     },
@@ -138,6 +140,7 @@ const tabs = new TabManager(
     onActiveConnection: (connection) => {
       showConnection(connection);
       resources.activeChanged();
+      usage.activeChanged();
       updateAgentStatusBar();
     },
     confirmCloseLastTab: async () => {
@@ -194,6 +197,9 @@ new TextSizeChip(app.querySelector<HTMLElement>(".res-mini")!, (fontSize, lineHe
 new ThemeChip(app.querySelector<HTMLElement>(".res-mini")!, (themeId) => tabs.applyTheme(themeId));
 new LanguageChip(app.querySelector<HTMLElement>(".res-mini")!);
 const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
+  tabs.resourceTargets(),
+);
+const usage = new UsageMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
 );
 const connect = (profile: StoredCommand) => void connectProfile(tabs, profile, vpn);
