@@ -26,7 +26,7 @@ import { loadTextSettings } from "./ui/text-settings";
 import { ThemeChip } from "./ui/theme-chip";
 import { loadTheme } from "./ui/theme-settings";
 import { LanguageChip } from "./ui/language-chip";
-import { loadLocale } from "./i18n";
+import { loadLocale, t, onLocaleChange } from "./i18n";
 import { showAbout } from "./ui/about";
 import { confirmCloseWindow } from "./ui/confirm-close";
 import "./styles/launcher.css";
@@ -57,7 +57,7 @@ app.innerHTML = `
     <div class="seg cwd"></div>
     <div class="seg branch" hidden><span class="ico">⎇</span> <span class="branch-name"></span></div>
     <div class="seg transport" hidden></div>
-    <button type="button" class="seg agents-status" hidden title="에이전트 대시보드 (⌘⇧A)"></button>
+    <button type="button" class="seg agents-status" hidden></button>
   </footer>
 `;
 
@@ -72,34 +72,46 @@ const status = {
   agentsStatus: app.querySelector<HTMLButtonElement>(".statusbar .agents-status")!,
 };
 
-const CONNECTION_STATE: Record<Connection["state"], string> = {
-  connecting: "연결 중…",
-  connected: "",
-  reconnecting: "재연결 중…",
-  offline: "오프라인",
-  stopped: "끊김",
-};
+function connectionStateLabel(state: Connection["state"]): string {
+  switch (state) {
+    case "connecting":
+      return t("statusbar.connectionConnecting");
+    case "connected":
+      return "";
+    case "reconnecting":
+      return t("statusbar.connectionReconnecting");
+    case "offline":
+      return t("statusbar.connectionOffline");
+    case "stopped":
+      return t("statusbar.connectionStopped");
+  }
+}
+
+// Cached so onLocaleChange can re-render the status bar without needing a
+// fresh event from the tab manager.
+let lastConnection: Connection | undefined;
+let lastContext: SessionContext | undefined;
 
 function showConnection(connection: Connection | undefined) {
+  lastConnection = connection;
   status.transport.hidden = !connection;
   if (!connection) return;
   const name = connection.transport === "mosh" ? "Mosh" : "SSH";
-  const state = CONNECTION_STATE[connection.state];
+  const state = connectionStateLabel(connection.state);
   status.transport.textContent = state ? `${name} · ${state}` : name;
   status.transport.dataset.state = connection.state;
   status.transport.title =
-    connection.transport === "mosh"
-      ? "Mosh: 네트워크가 바뀌어도 세션이 유지됩니다"
-      : "SSH: 끊기면 자동으로 다시 연결합니다";
+    connection.transport === "mosh" ? t("statusbar.moshTitle") : t("statusbar.sshTitle");
 }
 
 function showContext(context: SessionContext | undefined) {
+  lastContext = context;
   status.host.textContent = context?.host ?? "local";
   // Before the shell's first prompt (or for an SSH tab whose tmux pane was
   // already busy when it attached, so no hook event has arrived at all) cwd
   // is still unknown — show a placeholder so the button stays visible and
   // clickable instead of disappearing.
-  status.cwd.textContent = context?.cwd || "폴더 보기";
+  status.cwd.textContent = context?.cwd || t("statusbar.cwdPlaceholder");
   // Dim only when the button truly can't do anything (a tab the user ssh'd
   // into by hand, outside Burrow's SSH profiles) — not just because cwd
   // hasn't arrived yet, since the file browser can still fetch it itself now.
@@ -162,6 +174,13 @@ function updateAgentStatusBar() {
   );
 }
 status.agentsStatus.addEventListener("click", () => agents.toggle());
+status.agentsStatus.title = t("statusbar.agentsDashboard");
+// Never unsubscribed: main.ts's status bar lives for the app's lifetime.
+onLocaleChange(() => {
+  status.agentsStatus.title = t("statusbar.agentsDashboard");
+  showContext(lastContext);
+  showConnection(lastConnection);
+});
 // Dev builds: lets scripts/devctl read terminal state (e.g. `devctl screen`).
 const devBag: Record<string, unknown> = { tabs };
 if (import.meta.env.DEV) Object.assign(window, { __burrow: devBag });
@@ -208,22 +227,22 @@ const keys = new Keybindings({
 const focusTerminal = () => activeSession()?.focus();
 keys.register({
   id: "toggle-command-palette",
-  label: "커맨드 팔레트",
+  label: t("keybindings.actions.commandPalette"),
   run: () => palette.toggle(),
 });
 keys.register({
   id: "toggle-frequent-panel",
-  label: "자주 쓰는 명령어 패널",
+  label: t("keybindings.actions.frequentPanel"),
   run: () => frequent.toggle(),
 });
 keys.register({
   id: "toggle-agent-dashboard",
-  label: "에이전트 대시보드",
+  label: t("keybindings.actions.agentDashboard"),
   run: () => agents.toggle(),
 });
 keys.register({
   id: "open-command-manager",
-  label: "명령어·SSH 프로필 관리",
+  label: t("keybindings.actions.commandManager"),
   run: () => {
     if (manager.isOpen) manager.close();
     else void manager.open(undefined, focusTerminal);
@@ -231,20 +250,44 @@ keys.register({
 });
 keys.register({
   id: "open-keybindings",
-  label: "단축키 설정",
+  label: t("keybindings.actions.keybindingSettings"),
   run: () => (keys.isOpen ? keys.close() : keys.open(focusTerminal)),
 });
-keys.register({ id: "toggle-file-browser", label: "파일 탐색 패널", run: () => files.toggle() });
-keys.register({ id: "new-tab", label: "새 탭", run: () => void tabs.newTab() });
-keys.register({ id: "close-tab", label: "탭 닫기", run: () => tabs.close() });
-keys.register({ id: "next-tab", label: "다음 탭", run: () => tabs.selectRelative(1) });
-keys.register({ id: "previous-tab", label: "이전 탭", run: () => tabs.selectRelative(-1) });
+keys.register({
+  id: "toggle-file-browser",
+  label: t("keybindings.actions.fileBrowser"),
+  run: () => files.toggle(),
+});
+keys.register({
+  id: "new-tab",
+  label: t("keybindings.actions.newTab"),
+  run: () => void tabs.newTab(),
+});
+keys.register({
+  id: "close-tab",
+  label: t("keybindings.actions.closeTab"),
+  run: () => tabs.close(),
+});
+keys.register({
+  id: "next-tab",
+  label: t("keybindings.actions.nextTab"),
+  run: () => tabs.selectRelative(1),
+});
+keys.register({
+  id: "previous-tab",
+  label: t("keybindings.actions.previousTab"),
+  run: () => tabs.selectRelative(-1),
+});
 for (let n = 1; n <= 9; n++) {
-  keys.register({ id: `select-tab-${n}`, label: `${n}번째 탭`, run: () => tabs.select(n - 1) });
+  keys.register({
+    id: `select-tab-${n}`,
+    label: t("keybindings.actions.selectTab", { n: String(n) }),
+    run: () => tabs.select(n - 1),
+  });
 }
 keys.register({
   id: "copy",
-  label: "선택 영역 복사",
+  label: t("keybindings.actions.copySelection"),
   // Text fields in panels keep their native copy; in the terminal, no
   // selection means nothing happens (interrupting is Ctrl-C on macOS).
   run: (e) => {
@@ -254,7 +297,7 @@ keys.register({
   },
 });
 keys.addToggle(
-  "마우스로 선택하면 바로 복사",
+  t("keybindings.toggles.copyOnSelect"),
   () => tabs.copyOnSelect,
   (on) => {
     tabs.copyOnSelect = on;

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "./toast";
+import { t, onLocaleChange } from "../i18n";
 
 export interface VpnService {
   name: string;
@@ -19,9 +20,12 @@ const LOCK_OPEN = `<svg class="rm-icon" viewBox="0 0 16 16" fill="none"><rect x=
 
 function ago(since: number): string {
   const minutes = Math.floor((Date.now() - since) / 60000);
-  if (minutes < 1) return "방금 연결";
-  if (minutes < 60) return `${minutes}분째 연결`;
-  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분째 연결`;
+  if (minutes < 1) return t("vpnChip.justConnected");
+  if (minutes < 60) return t("vpnChip.connectedMinutes", { minutes: String(minutes) });
+  return t("vpnChip.connectedHoursMinutes", {
+    hours: String(Math.floor(minutes / 60)),
+    minutes: String(minutes % 60),
+  });
 }
 
 /** Lock chip in the terminal's top-right corner; click for the service list. */
@@ -52,6 +56,10 @@ export class VpnChip {
       }
     });
     void this.refresh();
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.render());
   }
 
   /** Polls now and restarts the interval, e.g. right after a pre-connect command. */
@@ -75,8 +83,8 @@ export class VpnChip {
         this.pending.delete(k);
         showToast(
           want.up
-            ? `${svc?.name ?? "VPN"}에 연결하지 못했습니다 — 비밀번호가 키체인에 없거나 앱 로그인이 필요한 VPN이면 시스템 설정이나 VPN 앱에서 한 번 연결해 주세요`
-            : `${svc?.name ?? "VPN"} 연결을 끊지 못했습니다`,
+            ? t("vpnChip.connectFailed", { name: svc?.name ?? "VPN" })
+            : t("vpnChip.disconnectFailed", { name: svc?.name ?? "VPN" }),
         );
       }
     }
@@ -95,7 +103,7 @@ export class VpnChip {
       await invoke("vpn_toggle", { kind: s.kind, name: s.name, up });
     } catch (err) {
       this.pending.delete(k);
-      showToast(`${s.name}: ${err}`);
+      showToast(t("vpnChip.toggleFailed", { name: s.name, error: String(err) }));
     }
     void this.refresh();
   }
@@ -105,8 +113,10 @@ export class VpnChip {
     this.chip.hidden = this.services.length === 0;
     const up = this.services.filter((s) => s.connected);
     this.chip.classList.toggle("connected", up.length > 0);
-    this.chip.innerHTML = `${up.length ? LOCK_CLOSED : LOCK_OPEN}<span>${up.length ? "VPN" : "VPN 꺼짐"}</span>`;
-    this.chip.title = up.length ? `연결됨: ${up.map((s) => s.name).join(", ")}` : "연결된 VPN 없음";
+    this.chip.innerHTML = `${up.length ? LOCK_CLOSED : LOCK_OPEN}<span>${up.length ? "VPN" : t("vpnChip.off")}</span>`;
+    this.chip.title = up.length
+      ? t("vpnChip.connectedTitle", { names: up.map((s) => s.name).join(", ") })
+      : t("vpnChip.noneConnectedTitle");
     if (!this.card.hidden) this.renderCard();
   }
 
@@ -121,12 +131,16 @@ export class VpnChip {
       dot.className = "vpn-dot";
       const name = document.createElement("span");
       name.className = "vpn-name";
-      name.textContent = s.kind === "utun" ? `알 수 없는 VPN (${s.name})` : s.name;
+      name.textContent = s.kind === "utun" ? t("vpnChip.unknownVpn", { name: s.name }) : s.name;
       const sub = document.createElement("span");
       sub.className = "vpn-sub";
       const since = this.since.get(`${s.kind}:${s.name}`);
       sub.textContent = [
-        s.connected && since ? ago(since) : s.connected ? "연결됨" : "꺼짐",
+        s.connected && since
+          ? ago(since)
+          : s.connected
+            ? t("vpnChip.connected")
+            : t("vpnChip.disconnected"),
         s.detail,
       ]
         .filter(Boolean)
@@ -141,11 +155,11 @@ export class VpnChip {
         btn.textContent =
           want || s.transitioning
             ? want?.up === false
-              ? "끊는 중…"
-              : "연결 중…"
+              ? t("vpnChip.disconnecting")
+              : t("vpnChip.connecting")
             : s.connected
-              ? "끊기"
-              : "연결";
+              ? t("vpnChip.disconnect")
+              : t("vpnChip.connect");
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           void this.toggle(s, !s.connected);
@@ -156,8 +170,7 @@ export class VpnChip {
     });
     const note = document.createElement("div");
     note.className = "vpn-note";
-    note.textContent =
-      "여기서 바로 켜고 끌 수 있습니다. SSH 프로필에 'VPN 명령'을 적어 두면 호스트에 닿지 않을 때 접속 전에 자동으로 실행합니다";
+    note.textContent = t("vpnChip.note");
     this.card.replaceChildren(head, ...rows, note);
   }
 }

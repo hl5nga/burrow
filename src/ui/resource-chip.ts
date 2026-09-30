@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t, onLocaleChange } from "../i18n";
 
 export interface ResourceSample {
   cpu: number;
@@ -72,6 +73,10 @@ export class ResourceMonitor {
       }
     });
     window.setInterval(() => this.tick(), 1000);
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.render());
   }
 
   /** The active tab changed: show what we have now, fetch if it's stale. */
@@ -130,10 +135,10 @@ export class ResourceMonitor {
   }
 
   private render() {
-    const t = this.active;
-    const hit = t && t.reachable ? this.samples.get(this.key(t)) : undefined;
+    const target = this.active;
+    const hit = target && target.reachable ? this.samples.get(this.key(target)) : undefined;
     this.chips.hidden = !hit;
-    if (!hit || !t) {
+    if (!hit || !target) {
       this.card.hidden = true;
       return;
     }
@@ -143,7 +148,11 @@ export class ResourceMonitor {
     this.chips.innerHTML =
       `<span class="rm-chip ${level(cpu)}">${CPU_ICON}${cpu}%</span>` +
       `<span class="rm-chip ${level(mem)}">${RAM_ICON}${mem}%</span>`;
-    this.chips.title = `${t.label} · CPU ${cpu}% · 메모리 ${mem}%`;
+    this.chips.title = t("resourceChip.cardTitleWithStats", {
+      label: target.label,
+      cpu: String(cpu),
+      mem: String(mem),
+    });
     if (this.card.hidden) return;
     const bar = (name: string, percent: number, detail: string) => `
       <div class="rh-row"><span>${name}</span><span class="rh-val ${level(percent)}">${percent}%</span></div>
@@ -151,11 +160,11 @@ export class ResourceMonitor {
       <div class="rh-detail">${detail}</div>`;
     const head = document.createElement("div");
     head.className = "rh-head";
-    head.textContent = t.label;
+    head.textContent = target.label;
     const body = document.createElement("div");
     body.innerHTML =
-      bar("CPU", cpu, `${s.cores}코어 · 최근 1초`) +
-      bar("메모리", mem, `${gb(s.memUsed)} / ${gb(s.memTotal)} GB`);
+      bar("CPU", cpu, t("resourceChip.cpuDetail", { cores: String(s.cores) })) +
+      bar(t("resourceChip.memoryLabel"), mem, `${gb(s.memUsed)} / ${gb(s.memTotal)} GB`);
     this.card.replaceChildren(head, body);
   }
 }

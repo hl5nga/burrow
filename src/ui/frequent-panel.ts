@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { TerminalSession } from "../terminal/session";
+import { t, onLocaleChange } from "../i18n";
 
 type Scope = "dir" | "host" | "all";
 
@@ -40,6 +41,8 @@ export class FrequentPanel {
   private readonly list = el("div", "freq-list");
   private readonly foot = el("div", "freq-panel-foot");
   private readonly tabs = new Map<Scope, HTMLButtonElement>();
+  private readonly titleText = el("span");
+  private readonly hint = el("div", "scope-hint");
   private scope: Scope = "dir";
   private items: Ranked[] = [];
   private open = true;
@@ -47,6 +50,10 @@ export class FrequentPanel {
   private seenKey = "";
   private seen = new Set<string>();
   private fresh = new Set<string>();
+  // Cached from the last refresh(), so retranslate() can re-render without a session.
+  private lastHost?: string;
+  private lastCwd = "";
+  private lastThreshold = 0;
 
   constructor(
     host: HTMLElement,
@@ -55,32 +62,49 @@ export class FrequentPanel {
     const head = el("div", "freq-panel-head");
     const titleRow = el("div", "fp-title-row");
     const title = el("h4");
-    title.append(el("span", "dot-live"), "자주 쓰는 명령어");
-    titleRow.append(title, el("span", "hotkey-hint", "⌘J"));
+    title.append(el("span", "dot-live"), this.titleText);
+    titleRow.append(title, el("span", "hotkey-hint", t("frequentPanel.hotkey")));
 
     const tabRow = el("div", "scope-tabs");
-    for (const [scope, label] of [
-      ["dir", "여기서"],
-      ["host", "이 호스트"],
-      ["all", "전체"],
-    ] as [Scope, string][]) {
-      const tab = el("button", "st", label);
+    for (const scope of ["dir", "host", "all"] as Scope[]) {
+      const tab = el("button", "st");
       tab.addEventListener("click", () => this.setScope(scope));
       this.tabs.set(scope, tab);
       tabRow.append(tab);
     }
-    const hint = el("div", "scope-hint", "← → 탭 전환 · 1–9 실행");
-    head.append(titleRow, tabRow, hint);
+    head.append(titleRow, tabRow, this.hint);
     this.element.append(head, this.list, this.foot);
     this.element.tabIndex = -1;
     this.element.addEventListener("keydown", (e) => this.onKey(e));
 
-    this.rail.title = "자주 쓰는 명령어 펼치기 (⌘J)";
-    this.rail.append(el("span", "rail-icon", "★"), el("span", "rail-hotkey", "⌘J"));
+    this.rail.append(
+      el("span", "rail-icon", "★"),
+      el("span", "rail-hotkey", t("frequentPanel.hotkey")),
+    );
     this.rail.addEventListener("click", () => this.setOpen(true, true));
 
     host.append(this.element, this.rail);
     this.updateTabs();
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.titleText.textContent = t("frequentPanel.title");
+    this.hint.textContent = t("frequentPanel.footerHint");
+    this.rail.title = t("frequentPanel.railTitle");
+    this.tabs.get("dir")!.textContent = t("frequentPanel.scopeDir");
+    this.tabs.get("all")!.textContent = t("frequentPanel.scopeAll");
+    this.tabs.get("host")!.textContent =
+      this.lastHost === undefined
+        ? t("frequentPanel.scopeHost")
+        : this.lastHost === "local"
+          ? t("frequentPanel.scopeHostLocal")
+          : t("frequentPanel.scopeHostRemote");
+    if (this.lastHost !== undefined) this.render(this.lastCwd, this.lastThreshold);
   }
 
   async init() {
@@ -118,38 +142,45 @@ export class FrequentPanel {
     }
 
     this.items = items;
-    this.tabs.get("host")!.textContent = host === "local" ? "로컬" : "이 서버";
+    this.lastHost = host;
+    this.lastCwd = cwd;
+    this.lastThreshold = config.promotionThreshold;
+    this.tabs.get("host")!.textContent =
+      host === "local" ? t("frequentPanel.scopeHostLocal") : t("frequentPanel.scopeHostRemote");
     this.render(cwd, config.promotionThreshold);
   }
 
   private render(cwd: string, threshold: number) {
     this.list.replaceChildren();
     if (this.items.length === 0) {
-      const where = this.scope === "dir" ? `${basename(cwd)} 폴더에서` : "여기서";
+      const where =
+        this.scope === "dir"
+          ? t("frequentPanel.emptyWhereDir", { folder: basename(cwd) })
+          : t("frequentPanel.emptyWhereOther");
       this.list.append(
-        el(
-          "div",
-          "freq-empty",
-          `${where} ${threshold}회 이상 쓴 명령어가 아직 없습니다. 쓰다 보면 여기에 자동으로 올라옵니다.`,
-        ),
+        el("div", "freq-empty", t("frequentPanel.empty", { where, threshold: String(threshold) })),
       );
     }
     this.items.forEach((item, index) => {
       const row = el("button", index === 0 ? "freq-item top" : "freq-item");
       const main = el("div", "fi-main");
       main.append(el("div", "fi-cmd", item.command));
-      if (this.fresh.has(item.command)) main.append(el("div", "fi-meta fresh", "방금 승격됨"));
+      if (this.fresh.has(item.command))
+        main.append(el("div", "fi-meta fresh", t("frequentPanel.freshlyPromoted")));
       row.append(
         el("span", "fi-key", String(index + 1)),
         main,
-        el("span", "fi-count", `${item.count}회`),
+        el("span", "fi-count", t("frequentPanel.count", { count: String(item.count) })),
       );
-      row.title = `${item.command} — 클릭 또는 ${index + 1} 키로 실행`;
+      row.title = t("frequentPanel.runHint", {
+        command: item.command,
+        index: String(index + 1),
+      });
       row.addEventListener("click", () => this.run(index));
       this.list.append(row);
     });
     this.foot.replaceChildren(
-      el("span", undefined, `${threshold}회 이상 자동 노출`),
+      el("span", undefined, t("frequentPanel.autoThreshold", { threshold: String(threshold) })),
       el("span", undefined, `${this.items.length}/${LIMIT}`),
     );
   }

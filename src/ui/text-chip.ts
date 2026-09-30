@@ -6,8 +6,11 @@ import {
   DEFAULT_TEXT_SETTINGS,
   FONT_SIZES,
 } from "./text-settings";
+import { t, onLocaleChange } from "../i18n";
 
-const LINE_LABELS = ["좁게", "보통", "넓게"];
+function lineLabels(): string[] {
+  return [t("textChip.lineNarrow"), t("textChip.lineNormal"), t("textChip.lineWide")];
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) {
   const node = document.createElement(tag);
@@ -31,7 +34,6 @@ export class TextSizeChip {
     private readonly onChange: (fontSize: number, lineHeight: number) => void,
   ) {
     this.chip.type = "button";
-    this.chip.title = "글자 크기 · 줄 간격";
     this.card.hidden = true;
     corner.append(this.chip, this.card);
     this.chip.addEventListener("click", (e) => {
@@ -44,6 +46,16 @@ export class TextSizeChip {
         this.card.hidden = true;
       }
     });
+
+    // Lives for the app's lifetime (a top-level singleton, see main.ts), so
+    // this subscription is never unsubscribed — same as command-manager.ts.
+    onLocaleChange(() => this.retranslate());
+    this.retranslate();
+  }
+
+  private retranslate() {
+    this.chip.title = t("textChip.title");
+    if (!this.card.hidden) this.render();
   }
 
   private async set(next: Partial<{ fontLevel: number; lineLevel: number }>) {
@@ -54,16 +66,16 @@ export class TextSizeChip {
   }
 
   private render() {
-    const head = el("div", "rh-head", "글자·줄 간격");
+    const head = el("div", "rh-head", t("textChip.head"));
 
     const fontRow = el("div", "text-row");
     fontRow.append(
-      el("span", "text-row-label", "글자 크기"),
+      el("span", "text-row-label", t("textChip.fontSizeLabel")),
       el("span", "text-row-level", `${current.fontLevel}/${FONT_SIZES.length}`),
     );
     const fontControls = el("div", "text-stepper");
     const dec = el("button", "text-step", "－");
-    const preview = el("span", "text-preview", "Aa 가나 123");
+    const preview = el("span", "text-preview", t("textChip.preview"));
     preview.style.fontSize = `${fontSizePx(current.fontLevel)}px`;
     const inc = el("button", "text-step", "＋");
     dec.type = inc.type = "button";
@@ -75,9 +87,9 @@ export class TextSizeChip {
     fontRow.append(fontControls);
 
     const lineRow = el("div", "text-row");
-    lineRow.append(el("span", "text-row-label", "줄 간격"));
+    lineRow.append(el("span", "text-row-label", t("textChip.lineHeightLabel")));
     const lineToggle = el("div", "type-toggle");
-    LINE_LABELS.forEach((label, i) => {
+    lineLabels().forEach((label, i) => {
       const level = i + 1;
       const opt = el("button", level === current.lineLevel ? "opt active" : "opt", label);
       opt.type = "button";
@@ -86,7 +98,7 @@ export class TextSizeChip {
     });
     lineRow.append(lineToggle);
 
-    const reset = el("button", "text-reset", "기본값으로");
+    const reset = el("button", "text-reset", t("textChip.reset"));
     reset.type = "button";
     reset.hidden =
       current.fontLevel === DEFAULT_TEXT_SETTINGS.fontLevel &&
