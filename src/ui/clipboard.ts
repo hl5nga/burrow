@@ -1,4 +1,13 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export async function copyText(text: string): Promise<void> {
+  // Native first: works without a browser user gesture (e.g. from the menu).
+  try {
+    await invoke("clip_text_write", { text });
+    return;
+  } catch {
+    // Falls through to the web APIs.
+  }
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);

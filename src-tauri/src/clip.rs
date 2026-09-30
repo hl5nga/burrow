@@ -165,3 +165,24 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
+
+/// Puts text on the system clipboard. Done natively because a copy triggered
+/// by the native Edit menu arrives without a browser user gesture, and the
+/// webview refuses `navigator.clipboard` / `execCommand("copy")` without one.
+#[tauri::command]
+pub fn clip_text_write(text: String) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new("pbcopy")
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    child
+        .stdin
+        .take()
+        .ok_or("no stdin")?
+        .write_all(text.as_bytes())
+        .map_err(|e| e.to_string())?;
+    child.wait().map_err(|e| e.to_string())?;
+    Ok(())
+}
