@@ -32,8 +32,19 @@ export function chooseDialog<T extends string>(
     row.className = "dialog-actions";
     const finish = (value: T | undefined) => {
       overlay.remove();
-      previous?.focus();
       resolve(value);
+      // Enter/Space activate a button on keydown, but the key isn't over yet:
+      // handing focus straight to the terminal lets the rest of that same
+      // keypress land there (as a stray newline). Wait for the key to come up.
+      let restored = false;
+      const restore = () => {
+        if (restored) return;
+        restored = true;
+        window.removeEventListener("keyup", restore, true);
+        previous?.focus();
+      };
+      window.addEventListener("keyup", restore, true);
+      window.setTimeout(restore, 300);
     };
     for (const b of buttons) {
       const button = document.createElement("button");

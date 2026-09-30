@@ -167,6 +167,21 @@ export function installImeHandler(term: Terminal, container: HTMLElement): ImeHa
       },
     ],
     [
+      // Enter reaches the shell only as a keydown (keySequence). A line break
+      // arriving as a text edit is a leftover from a key that started
+      // elsewhere — e.g. Enter on a dialog button whose handler moved focus
+      // here before the keypress finished — and would be typed into the shell
+      // as a stray newline.
+      "beforeinput",
+      (e) => {
+        const type = (e as InputEvent).inputType;
+        if (type === "insertLineBreak" || type === "insertParagraph") {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+    ],
+    [
       "input",
       (e) => {
         e.stopPropagation();
