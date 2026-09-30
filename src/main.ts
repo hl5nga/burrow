@@ -363,13 +363,6 @@ function editProfile(profile: StoredCommand, onDone: () => void) {
  * Nothing to cancel back to yet, so the list isn't dismissible here.
  */
 async function start() {
-  // Maximized from here, after the page is up, rather than via the window's
-  // "maximized" config: starting the window already maximized (with the
-  // overlay titlebar) left WKWebView's click coordinates offset from what it
-  // drew — every button only reacted to clicks a few mm to its left.
-  await getCurrentWindow()
-    .maximize()
-    .catch(() => {});
   // Before any tab opens, so the very first one is sized correctly and
   // doesn't flash at the default before jumping to the saved size.
   await loadTextSettings();
