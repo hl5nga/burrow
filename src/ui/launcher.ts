@@ -203,12 +203,14 @@ export class Launcher {
     }
     this.netChip.textContent = t(this.online ? "launcher.online" : "launcher.offline");
     this.netChip.classList.toggle("offline", !this.online);
-    for (const row of this.list.querySelectorAll<HTMLButtonElement>(".launcher-row.ssh")) {
-      row.disabled = !this.online;
+    for (const row of this.list.querySelectorAll<HTMLDivElement>(".launcher-row.ssh")) {
       row.classList.toggle("disabled", !this.online);
+      row.tabIndex = this.online ? 0 : -1;
       row.title = this.online ? "" : t("launcher.offlineHint");
       const connect = row.querySelector<HTMLButtonElement>(".launcher-connect");
       if (connect) connect.disabled = !this.online;
+      const edit = row.querySelector<HTMLButtonElement>(".launcher-edit");
+      if (edit) edit.disabled = !this.online;
     }
   }
 
@@ -229,11 +231,17 @@ export class Launcher {
     }
   }
 
-  private row(entry: LauncherEntry, autoOpenId: string | null): HTMLButtonElement {
+  private row(entry: LauncherEntry, autoOpenId: string | null): HTMLDivElement {
     const id = entryId(entry);
     const isSsh = entry.kind === "ssh";
-    const row = el("button", isSsh ? "launcher-row ssh" : "launcher-row local");
-    row.type = "button";
+    // A <div>, not a <button>: the row itself is clickable (connects/opens),
+    // but also has to contain the real "Connect"/edit <button>s inside it —
+    // a <button> can't nest another <button> (invalid HTML, and unreliable
+    // to click in WebKit specifically), which is exactly what made the edit
+    // icon unclickable.
+    const row = el("div", isSsh ? "launcher-row ssh" : "launcher-row local");
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
     row.dataset.entryId = id;
 
     const dot = el("span", "launcher-dot unknown");
@@ -284,7 +292,15 @@ export class Launcher {
     }
 
     row.append(icon(entry), dot, main, ...(edit ? [edit] : []), auto, connect);
-    row.addEventListener("click", () => this.resolveEntry?.(entry));
+    row.addEventListener("click", () => {
+      if (!row.classList.contains("disabled")) this.resolveEntry?.(entry);
+    });
+    row.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && !row.classList.contains("disabled")) {
+        e.preventDefault();
+        this.resolveEntry?.(entry);
+      }
+    });
 
     if (isSsh) {
       void checkReachable(entry.profile.id).then((r) => {
