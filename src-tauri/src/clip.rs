@@ -169,28 +169,37 @@ mod tests {
 /// Puts text on the system clipboard. Done natively because a copy triggered
 /// by the native Edit menu arrives without a browser user gesture, and the
 /// webview refuses `navigator.clipboard` / `execCommand("copy")` without one.
+///
+/// On macOS it goes straight to NSPasteboard as an exact UTF-8 → NSString
+/// conversion. The old `pbcopy` route decoded its stdin by the process's locale
+/// or user text encoding, so Korean (and any non-English) text could land on
+/// the clipboard as mojibake depending on how the app was launched.
 #[tauri::command]
 pub fn clip_text_write(text: String) -> Result<(), String> {
-    use std::io::Write;
     // Session 0 in the input trace = "what the app put on the clipboard".
     crate::pty::trace_input(0, text.as_bytes());
-    use std::process::{Command, Stdio};
-    // pbcopy decodes stdin by the process locale: with a non-UTF-8 one the
-    // Korean text lands on the clipboard as mojibake. LC_ALL beats every other
-    // locale variable, so the app's own environment can't matter.
-    let mut child = Command::new("pbcopy")
-        .env("LC_ALL", "UTF-8")
-        .stdin(Stdio::piped())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    child
-        .stdin
-        .take()
-        .ok_or("no stdin")?
-        .write_all(text.as_bytes())
-        .map_err(|e| e.to_string())?;
-    child.wait().map_err(|e| e.to_string())?;
-    Ok(())
+    write_text(&text)
+}
+
+#[cfg(target_os = "macos")]
+fn write_text(text: &str) -> Result<(), String> {
+    use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
+    use objc2_foundation::NSString;
+    let pasteboard = NSPasteboard::generalPasteboard();
+    pasteboard.clearContents();
+    let string = NSString::from_str(text);
+    // SAFETY: NSPasteboardTypeString is a valid, immutable AppKit constant.
+    let ok = pasteboard.setString_forType(&string, unsafe { NSPasteboardTypeString });
+    if ok {
+        Ok(())
+    } else {
+        Err("클립보드에 쓰지 못했습니다".into())
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn write_text(_text: &str) -> Result<(), String> {
+    Err("clipboard write is only implemented on macOS".into())
 }
 
 #[cfg(test)]
@@ -200,11 +209,14 @@ mod text_tests {
     #[test]
     #[cfg(target_os = "macos")]
     fn korean_text_survives_the_clipboard() {
-        clip_text_write("권장안 Bill/Supplier를 Copy Equipment의 대상 범위".into()).unwrap();
-        let out = std::process::Command::new("pbpaste").output().unwrap();
-        assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
-            "권장안 Bill/Supplier를 Copy Equipment의 대상 범위"
-        );
+        use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
+        let text = "권장안 Bill/Supplier를 Copy Equipment의 대상 범위";
+        clip_text_write(text.into()).unwrap();
+        // Read it back from the pasteboard itself, not through a CLI that
+        // converts to the reader's locale encoding.
+        let back = NSPasteboard::generalPasteboard()
+            .stringForType(unsafe { NSPasteboardTypeString })
+            .map(|s| s.to_string());
+        assert_eq!(back.as_deref(), Some(text));
     }
 }

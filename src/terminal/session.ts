@@ -183,12 +183,20 @@ export async function openTerminalSession(
   // the clipboard. Without this, selecting text inside tmux copied nowhere —
   // tmux owns that selection, xterm never sees it. "?" (a read request) is
   // ignored on purpose: no program may read the user's clipboard.
+  // Claude Code in tmux sends the same copy three ways at once (tmux's own
+  // buffer, a raw OSC 52 and a passthrough-wrapped one), so repeats of the same
+  // text within a moment are one copy.
+  let lastOsc52 = { payload: "", at: 0 };
   const clipboardOsc = term.parser.registerOscHandler(52, (data) => {
     const payload = data.slice(data.indexOf(";") + 1);
     if (!payload || payload === "?") return true;
+    const now = Date.now();
+    if (payload === lastOsc52.payload && now - lastOsc52.at < 800) return true;
+    lastOsc52 = { payload, at: now };
     try {
+      // base64 → bytes → UTF-8 (atob alone yields Latin-1 characters).
       const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
-      void copyText(scrub(new TextDecoder().decode(bytes)));
+      void copyText(scrub(new TextDecoder("utf-8").decode(bytes)));
     } catch {
       // Malformed base64: nothing sensible to copy.
     }
