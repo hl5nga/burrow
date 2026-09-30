@@ -8,6 +8,13 @@
   background: var(--bg-panel);
 }
 
+/* display:flex above would otherwise beat the browser's own [hidden] rule —
+   hiding the launcher (e.g. while the Edit form is open) did nothing, and it
+   kept covering the command manager underneath it. */
+.launcher-overlay[hidden] {
+  display: none;
+}
+
 .launcher {
   width: min(560px, calc(100vw - 48px));
   max-height: calc(100vh - 80px);
