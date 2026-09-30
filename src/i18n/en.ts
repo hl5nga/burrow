@@ -44,8 +44,6 @@ const en: Loose<typeof ko> = {
     body1: "Every open local terminal session will end.",
     body2:
       "Remote tmux sessions over SSH stay on the server and pick up where they left off next time you connect.",
-    body3:
-      'If a profile has a "VPN disconnect command" set, any VPN with no tabs left using it will be turned off too.',
     cancel: "Cancel",
     close: "Close",
   },
