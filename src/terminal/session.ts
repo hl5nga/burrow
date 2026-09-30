@@ -179,6 +179,21 @@ export async function openTerminalSession(
     oscSeen = true;
     return handleHookData(data);
   });
+  // OSC 52: a program (tmux with mouse on, vim, …) asks the terminal to set
+  // the clipboard. Without this, selecting text inside tmux copied nowhere —
+  // tmux owns that selection, xterm never sees it. "?" (a read request) is
+  // ignored on purpose: no program may read the user's clipboard.
+  const clipboardOsc = term.parser.registerOscHandler(52, (data) => {
+    const payload = data.slice(data.indexOf(";") + 1);
+    if (!payload || payload === "?") return true;
+    try {
+      const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+      void copyText(scrub(new TextDecoder().decode(bytes)));
+    } catch {
+      // Malformed base64: nothing sensible to copy.
+    }
+    return true;
+  });
   const ime = installImeHandler(term, container);
 
   // Option-drag selects a column. When an app has the mouse (vim, htop, tmux
@@ -344,6 +359,7 @@ export async function openTerminalSession(
       container.removeEventListener("mousedown", onMouseDown, true);
       container.removeEventListener("paste", onPasteEvent, true);
       hookOsc.dispose();
+      clipboardOsc.dispose();
       blocks.dispose();
       ime.dispose();
       removeDevLog();
