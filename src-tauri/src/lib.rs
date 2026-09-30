@@ -143,6 +143,8 @@ pub fn run() {
                 let _ = app.emit("menu-about", ());
             } else if id == menu::VIEW_STARTUP_ID {
                 let _ = app.emit("menu-view-startup", ());
+            } else if id == menu::COPY_ID {
+                let _ = app.emit("menu-copy", ());
             }
         })
         .setup(|app| {

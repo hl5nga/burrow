@@ -387,6 +387,16 @@ async function viewStartup() {
   if (entry) await openEntry(entry);
 }
 void listen("menu-view-startup", () => void viewStartup());
+// ⌘C arrives from the native Edit menu (see menu.rs): the terminal copies its
+// own selection, anything else (a text field) copies natively.
+void listen("menu-copy", () => {
+  const session = activeSession();
+  if (session && app.querySelector(".term-body")?.contains(document.activeElement)) {
+    void session.copySelection();
+  } else {
+    document.execCommand("copy");
+  }
+});
 void listen("menu-about", () => void showAbout());
 void listen("confirm-quit", () => void handleConfirmQuit());
 

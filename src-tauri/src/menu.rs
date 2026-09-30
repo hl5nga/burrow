@@ -19,6 +19,7 @@ use tauri::{AppHandle, Runtime};
 
 pub const ABOUT_ID: &str = "about-burrow";
 pub const VIEW_STARTUP_ID: &str = "view-startup";
+pub const COPY_ID: &str = "menu-copy";
 
 struct Labels {
     about: &'static str,
@@ -119,12 +120,19 @@ fn build_with_labels<R: Runtime>(app: &AppHandle<R>, l: &Labels) -> tauri::Resul
         .separator()
         .quit_with_text(l.quit)
         .build()?;
+    // Custom (not the predefined Copy): a native ⌘C item swallows the key
+    // before the webview sees it, and xterm's selection is not a DOM
+    // selection, so the native copy would put nothing (or stale text) on the
+    // clipboard. The frontend decides what "copy" means for the focus.
+    let copy = MenuItemBuilder::with_id(COPY_ID, l.copy)
+        .accelerator("CmdOrCtrl+C")
+        .build(app)?;
     let edit = SubmenuBuilder::new(app, l.edit_menu)
         .undo_with_text(l.undo)
         .redo_with_text(l.redo)
         .separator()
         .cut_with_text(l.cut)
-        .copy_with_text(l.copy)
+        .item(&copy)
         .paste_with_text(l.paste)
         .select_all_with_text(l.select_all)
         .build()?;
