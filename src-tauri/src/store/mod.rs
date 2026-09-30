@@ -198,6 +198,14 @@ impl Store {
                 if file.tools.is_empty() {
                     file.tools = model::agent_presets();
                 }
+                // Newer built-in phrases (the AI CLIs' wording drifts) reach
+                // existing files once; without this an old file never detects
+                // a screen the presets have learned to read.
+                if file.absorb_presets() {
+                    if let Err(e) = self.save(&file) {
+                        eprintln!("store: cannot update agent-patterns.json: {e}");
+                    }
+                }
                 serde_json::to_value(file)
             }
             "guardrails" => serde_json::to_value(self.load::<GuardrailsFile>()),

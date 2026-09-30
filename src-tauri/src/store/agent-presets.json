@@ -2,14 +2,37 @@
   "claude-code": {
     "label": "Claude Code",
     "commands": ["claude"],
-    "detect": ["Claude Code", "\\? for shortcuts", "shift\\+tab to cycle", "/clear to save"],
+    "detect": [
+      "Claude Code",
+      "\\? for shortcuts",
+      "shift\\+tab to cycle",
+      "/clear to save",
+      "bypass permissions on",
+      "auto mode on",
+      "accept edits on",
+      "plan mode on",
+      "⏵⏵ ",
+      "Esc to cancel · Tab to amend",
+      "Do you want to (proceed|make this edit|create|allow|run)",
+      "^[✻✽✢✶✳·*] \\S.*… \\("
+    ],
     "waitingApproval": [
       "Do you want to (proceed|make this edit|create|allow|run)",
       "Would you like to proceed\\?"
     ],
-    "working": ["esc to interrupt", "^[✻✽✢✶✳·*] \\S.*…"],
+    "working": [
+      "esc to interrupt",
+      "^[✻✽✢✶✳·*] \\S.*…",
+      "\\(\\d+[ms]( \\d+s)? · [↓↑]",
+      "Running \\d+ [a-z ]+ · \\d+[ms]"
+    ],
     "error": ["API Error", "^\\s*⎿\\s+Error:"],
-    "idle": ["\\? for shortcuts", "^[✻✽✢✶✳·*] .+ · done", "shift\\+tab to cycle"]
+    "idle": [
+      "\\? for shortcuts",
+      "^[✻✽✢✶✳·*] .+ · done",
+      "shift\\+tab to cycle",
+      "⏵⏵ .* \\(shift\\+tab to cycle\\)"
+    ]
   },
   "codex": {
     "label": "Codex",

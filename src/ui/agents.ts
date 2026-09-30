@@ -54,7 +54,7 @@ type TmuxPanes = { state: "panes"; panes: Pane[] } | { state: "none" };
 
 const SCAN_DEBOUNCE_MS = 300;
 const PANE_POLL_OPEN_MS = 5000;
-const PANE_POLL_CLOSED_MS = 15_000;
+const PANE_POLL_CLOSED_MS = 6000;
 
 function stateText(state: AgentState): string {
   return t(`agents.state.${state}`);

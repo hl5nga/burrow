@@ -202,7 +202,49 @@ pub struct AgentPattern {
 pub struct AgentPatternsFile {
     #[serde(default = "current_version")]
     pub version: u32,
+    /// Which generation of the built-in presets this file has absorbed. Files
+    /// from before a newer generation get the new phrases added once (their own
+    /// edits stay; a phrase deleted afterwards is not brought back).
+    #[serde(default = "no_presets_yet", rename = "presetRevision")]
+    pub preset_revision: u32,
     pub tools: HashMap<String, AgentPattern>,
+}
+
+/// Bump when agent-presets.json gains phrases users should get too.
+pub const PRESET_REVISION: u32 = 2;
+
+fn no_presets_yet() -> u32 {
+    0
+}
+
+impl AgentPatternsFile {
+    /// Adds every preset phrase the file doesn't have yet; true if anything changed.
+    pub fn absorb_presets(&mut self) -> bool {
+        if self.preset_revision >= PRESET_REVISION {
+            return false;
+        }
+        for (id, preset) in agent_presets() {
+            let Some(mine) = self.tools.get_mut(&id) else {
+                self.tools.insert(id, preset);
+                continue;
+            };
+            fn union(mine: &mut Vec<String>, preset: Vec<String>) {
+                for phrase in preset {
+                    if !mine.contains(&phrase) {
+                        mine.push(phrase);
+                    }
+                }
+            }
+            union(&mut mine.commands, preset.commands);
+            union(&mut mine.detect, preset.detect);
+            union(&mut mine.waiting_approval, preset.waiting_approval);
+            union(&mut mine.working, preset.working);
+            union(&mut mine.error, preset.error);
+            union(&mut mine.idle, preset.idle);
+        }
+        self.preset_revision = PRESET_REVISION;
+        true
+    }
 }
 
 /// Wording as of mid-2026; a best effort, meant to be edited. The same JSON
@@ -215,6 +257,7 @@ impl Default for AgentPatternsFile {
     fn default() -> Self {
         Self {
             version: CURRENT_VERSION,
+            preset_revision: PRESET_REVISION,
             tools: agent_presets(),
         }
     }

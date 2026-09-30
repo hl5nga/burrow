@@ -306,3 +306,46 @@ fn agent_presets_fill_files_written_before_them() {
         .unwrap()
         .is_empty());
 }
+
+#[test]
+fn older_pattern_files_absorb_new_presets_once() {
+    let root = TempRoot::new();
+    let store = Store::open(root.0.clone()).unwrap();
+    // A file from before presets were versioned: its own edits, old phrases.
+    fs::write(
+        root.0.join("agent-patterns.json"),
+        r#"{"version":1,"tools":{"claude-code":{"label":"Mine","commands":["claude"],
+            "detect":["Claude Code"],"waitingApproval":[],"working":["my spinner"],
+            "error":[],"idle":["\\? for shortcuts"]}}}"#,
+    )
+    .unwrap();
+    let value = store.get_json("agent-patterns").unwrap();
+    let cc = &value["tools"]["claude-code"];
+    assert_eq!(cc["label"], "Mine");
+    let detect: Vec<&str> = cc["detect"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(detect.contains(&"Claude Code") && detect.contains(&"bypass permissions on"));
+    assert!(cc["working"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "my spinner"));
+    assert_eq!(value["presetRevision"], model::PRESET_REVISION);
+
+    // Absorbed once: a phrase the user removes afterwards stays removed.
+    let mut edited = value.clone();
+    edited["tools"]["claude-code"]["detect"] = serde_json::json!(["Claude Code"]);
+    store.put_json("agent-patterns", edited).unwrap();
+    let again = store.get_json("agent-patterns").unwrap();
+    assert_eq!(
+        again["tools"]["claude-code"]["detect"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
