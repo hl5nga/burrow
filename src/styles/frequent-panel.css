@@ -22,47 +22,9 @@
   display: none;
 }
 
-.freq-panel:focus-within .freq-panel-head h4 {
-  color: var(--amber);
-}
-
 .freq-panel-head {
-  padding: 14px 14px 12px;
+  padding: 10px 14px 12px;
   border-bottom: 1px solid var(--border);
-}
-
-.fp-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.fp-title-row h4 {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--ui);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-hi);
-}
-
-.fp-title-row .dot-live {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--amber);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--amber) 35%, transparent);
-}
-
-.hotkey-hint {
-  padding: 2px 6px;
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-  border-radius: 4px;
 }
 
 .scope-tabs {

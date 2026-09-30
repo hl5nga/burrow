@@ -45,7 +45,6 @@ export class FrequentPanel {
   private readonly list = el("div", "freq-list");
   private readonly foot = el("div", "freq-panel-foot");
   private readonly tabs = new Map<Scope, HTMLButtonElement>();
-  private readonly titleText = el("span");
   private readonly hint = el("div", "scope-hint");
   private scope: Scope = "dir";
   private view: View = "commands";
@@ -68,11 +67,6 @@ export class FrequentPanel {
     private readonly getSession: () => TerminalSession | undefined,
   ) {
     const head = el("div", "freq-panel-head");
-    const titleRow = el("div", "fp-title-row");
-    const title = el("h4");
-    title.append(el("span", "dot-live"), this.titleText);
-    titleRow.append(title, el("span", "hotkey-hint", t("frequentPanel.hotkey")));
-
     const tabRow = el("div", "scope-tabs");
     for (const scope of ["dir", "host", "all"] as Scope[]) {
       const tab = el("button", "st");
@@ -80,7 +74,7 @@ export class FrequentPanel {
       this.tabs.set(scope, tab);
       tabRow.append(tab);
     }
-    head.append(titleRow, tabRow, this.hint);
+    head.append(tabRow, this.hint);
     this.head = head;
     this.element.append(head, this.list, this.foot);
     this.element.tabIndex = -1;
@@ -144,9 +138,11 @@ export class FrequentPanel {
   }
 
   private retranslate() {
-    this.viewTabs.get("commands")?.replaceChildren(t("tasks.tabCommands"));
+    const commandsTab = this.viewTabs.get("commands");
+    commandsTab?.replaceChildren(t("tasks.tabCommands"));
+    if (commandsTab)
+      commandsTab.title = `${t("frequentPanel.title")} (${t("frequentPanel.hotkey")})`;
     this.viewTabs.get("tasks")?.replaceChildren(t("tasks.tabTasks"));
-    this.titleText.textContent = t("frequentPanel.title");
     this.hint.textContent = t("frequentPanel.footerHint");
     this.rail.title = t("frequentPanel.railTitle");
     this.tabs.get("dir")!.textContent = t("frequentPanel.scopeDir");
