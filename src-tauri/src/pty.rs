@@ -28,10 +28,37 @@ pub struct PtyState {
     next_id: AtomicU32,
 }
 
+/// Opt-in diagnostics (`open --env BURROW_TRACE_INPUT=1 Burrow.app`): appends
+/// every byte sent to a terminal process, escaped, to
+/// `$TMPDIR/burrow-input-trace.log` — for finding out where a stray key comes from.
+fn trace_input(id: u32, data: &[u8]) {
+    use std::io::Write as _;
+    if std::env::var_os("BURROW_TRACE_INPUT").is_none() {
+        return;
+    }
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let text: String = data
+        .iter()
+        .flat_map(|b| std::ascii::escape_default(*b))
+        .map(char::from)
+        .collect();
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(std::env::temp_dir().join("burrow-input-trace.log"))
+    {
+        let _ = writeln!(f, "{ms} session={id} {text}");
+    }
+}
+
 impl PtyState {
     pub fn write(&self, id: u32, data: &[u8]) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();
         let session = sessions.get_mut(&id).ok_or("unknown session")?;
+        trace_input(id, data);
         session.writer.write_all(data).map_err(|e| e.to_string())
     }
 
