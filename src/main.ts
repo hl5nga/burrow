@@ -369,6 +369,11 @@ async function start() {
   await loadTextSettings();
   await loadTheme();
   await loadLocale();
+  // Also before the first tab: the side panel's saved open/closed state
+  // changes the terminal's width, and a tab that starts at one width and
+  // jumps to another a moment later leaves remote apps (Claude Code's input
+  // box in tmux) drawn for the old width.
+  await frequent.init();
   const auto = await resolveAutoOpen();
   if (auto) {
     await openEntry(auto);
@@ -377,7 +382,6 @@ async function start() {
     while (!entry) entry = await new Launcher(app, openNewSshProfile, false, editProfile).open();
     await openEntry(entry);
   }
-  await frequent.init();
 }
 void start();
 
