@@ -126,9 +126,11 @@
 }
 
 .viewer-overlay {
-  position: fixed;
+  /* Covers the terminal area only (it lives in .term-body), so the right-hand
+     panel stays visible and usable beside it. Above the corner chips (z 10). */
+  position: absolute;
   inset: 0;
-  z-index: 870;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -145,8 +147,8 @@
 .viewer {
   display: flex;
   flex-direction: column;
-  width: calc(100vw - 32px);
-  height: calc(100vh - 32px);
+  width: calc(100% - 24px);
+  height: calc(100% - 24px);
   overflow: hidden;
   background: var(--bg-panel);
   border: 1px solid var(--text-dim);

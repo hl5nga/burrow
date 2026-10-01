@@ -82,7 +82,9 @@ export class FileBrowser {
     this.panel.hidden = true;
     workspace.prepend(this.panel);
     this.viewer.hidden = true;
-    document.body.append(this.viewer);
+    // Inside the terminal area, not over the whole window: the right-hand
+    // panel (tasks, frequent commands) stays usable next to an open document.
+    (workspace.querySelector<HTMLElement>(".term-body") ?? document.body).append(this.viewer);
     this.viewer.addEventListener("mousedown", (e) => {
       if (e.target === this.viewer) this.closeViewer();
     });
