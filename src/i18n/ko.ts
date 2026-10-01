@@ -373,6 +373,7 @@ export default {
     droppedRetryNotice: "[연결이 끊겼습니다 · {{delay}}초 후 다시 연결합니다] Enter: 지금 연결",
     unreachableRetryNotice:
       "[호스트에 닿지 않습니다 · {{reason}}] 계속 확인합니다 · Enter: 지금 확인",
+    vpnReconnectNotice: "[서버에 닿지 않습니다 · VPN을 다시 연결해 봅니다]",
     reconnectingNotice: "[다시 연결하는 중…]",
     reconnectErrorNotice: "[다시 연결하지 못했습니다: {{error}}] Enter: 다시 시도",
   },

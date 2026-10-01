@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { StoredCommand } from "./command-validation";
 import { chooseDialog } from "./dialog";
-import { checkReachable } from "./reachability";
+import { checkReachable, type Reachability } from "./reachability";
 import { showToast } from "./toast";
 import type { SessionTransport, TabManager } from "./tabs";
 import type { VpnChip } from "./vpn-chip";
@@ -57,6 +57,31 @@ async function bringUpVpn(
   }
   void vpn.refresh();
   return reach;
+}
+
+/**
+ * A dropped connection usually took its VPN down with it, so reconnecting
+ * can't succeed until the tunnel is back. Brings the profile's VPN up again
+ * (its own pre-connect command) when that makes sense:
+ * - the profile has such a command at all, and
+ * - this Mac isn't on one of the profile's home networks (no VPN needed there;
+ *   the host is simply down or asleep).
+ * Resolves with the reachability after waiting, and the profile's disconnect
+ * command to remember for this tab; undefined when nothing was attempted.
+ */
+export async function reconnectVpn(
+  profile: StoredCommand,
+  vpn: VpnChip,
+): Promise<{ reach: Reachability; vpnDisconnect: string | null } | undefined> {
+  if (!profile.vpnPreConnect?.trim()) return undefined;
+  const homes = profile.homeNetworks ?? [];
+  if (homes.length) {
+    const fp = await invoke<{ gatewayMac: string } | null>("network_fingerprint").catch(() => null);
+    if (fp && homes.some((h) => h.gatewayMac === fp.gatewayMac)) return undefined;
+  }
+  const label = profile.name || profile.sshHost || "SSH";
+  const reach = await bringUpVpn(profile, vpn, { kind: "unreachable", label }, homes.length > 0);
+  return { reach, vpnDisconnect: profile.vpnPostDisconnect?.trim() || null };
 }
 
 /** Profiles already told that installing mosh locally would help, this run. */

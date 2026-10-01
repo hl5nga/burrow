@@ -11,7 +11,7 @@ import { CommandPalette } from "./ui/palette";
 import { FrequentPanel } from "./ui/frequent-panel";
 import { CommandManager } from "./ui/command-manager";
 import { TabManager, type Connection } from "./ui/tabs";
-import { connectProfile } from "./ui/connect";
+import { connectProfile, reconnectVpn } from "./ui/connect";
 import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
 import { UsageMonitor } from "./ui/usage-chip";
@@ -166,6 +166,11 @@ const tabs = new TabManager(
     },
     onLastTabClosed: () => getCurrentWindow().close(),
     onNewTabRequest: () => void newTabPicker(),
+    reconnectVpn: async (profileId) => {
+      const file = await invoke<{ commands: StoredCommand[] }>("store_get", { kind: "commands" });
+      const profile = file.commands.find((c) => c.id === profileId);
+      return profile ? reconnectVpn(profile, vpn) : undefined;
+    },
   },
 );
 const activeSession = () => tabs.activeSession();

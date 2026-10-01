@@ -7,7 +7,7 @@ import {
 } from "../terminal/session";
 import type { HookEvent } from "../terminal/hook-events";
 import { showToast } from "./toast";
-import { checkReachable } from "./reachability";
+import { checkReachable, type Reachability } from "./reachability";
 import { guardPaste } from "./paste-guard";
 import type { Level, ResourceTarget } from "./resource-chip";
 import { t } from "../i18n";
@@ -30,11 +30,16 @@ interface ConnectionControl extends Connection {
   /** Consecutive attempts that reached sshd but failed right away. */
   quickFailures: number;
   timer?: number;
+  /** When the VPN was last brought up for this outage (rate limit); cleared once connected. */
+  vpnTriedAt?: number;
+  /** The user pressed reconnect: try the VPN again regardless of the rate limit. */
+  forceVpn?: boolean;
 }
 
 /** A process that dies this soon after starting never really connected. */
 const QUICK_EXIT_MS = 5000;
 const MAX_BACKOFF_S = 30;
+const VPN_RETRY_MS = 120_000;
 /** Probably authentication or a bad host: stop retrying and wait for Enter. */
 const MAX_QUICK_FAILURES = 3;
 
@@ -87,6 +92,15 @@ export interface TabEvents {
    */
   confirmCloseLastTab(): Promise<boolean>;
   onLastTabClosed(): void;
+  /**
+   * The host can't be reached while reconnecting: the app may bring the
+   * profile's VPN back up (a drop usually takes the VPN down too). Resolves
+   * with the reachability afterwards and the disconnect command to remember,
+   * or undefined if there is no VPN to bring up.
+   */
+  reconnectVpn(
+    profileId: string,
+  ): Promise<{ reach: Reachability; vpnDisconnect: string | null } | undefined>;
   /** The ＋ button: the app decides what a new tab is (usually a connection picker). */
   onNewTabRequest(): void;
 }
@@ -305,6 +319,11 @@ export class TabManager {
   }
 
   /** Mosh roams on its own; SSH tabs that are waiting to reconnect retry now. */
+  /** One VPN attempt per outage, then at most one every two minutes (or when asked to). */
+  private shouldTryVpn(c: ConnectionControl): boolean {
+    return c.forceVpn === true || !c.vpnTriedAt || Date.now() - c.vpnTriedAt > VPN_RETRY_MS;
+  }
+
   /**
    * The status-bar chip: reconnect the active tab right now, like pressing
    * Enter in a dropped tab. False when there is nothing to reconnect.
@@ -316,6 +335,7 @@ export class TabManager {
     window.clearTimeout(c.timer);
     c.attempt = 0;
     c.quickFailures = 0;
+    c.forceVpn = true;
     this.scheduleReconnect(tab, 0);
     return true;
   }
@@ -403,6 +423,7 @@ export class TabManager {
             if (data.includes("\r") && tab.connection) {
               tab.connection.attempt = 0;
               tab.connection.quickFailures = 0;
+              tab.connection.forceVpn = true;
               this.scheduleReconnect(tab, 0);
             }
           },
@@ -628,8 +649,24 @@ export class TabManager {
     c.attempt++;
     // Don't let ssh sit in a long TCP timeout while the host is asleep or the
     // network is down; a 2-second check decides whether to try at all.
-    const reach = await checkReachable(c.profileId, true);
+    let reach = await checkReachable(c.profileId, true);
     if (!this.tabs.includes(tab)) return;
+    if (reach.state === "offline" && this.shouldTryVpn(c)) {
+      c.vpnTriedAt = Date.now();
+      c.forceVpn = false;
+      session.notice(t("tabs.vpnReconnectNotice"));
+      try {
+        const vpn = await this.events.reconnectVpn(c.profileId);
+        if (!this.tabs.includes(tab)) return;
+        if (vpn) {
+          reach = vpn.reach;
+          // The VPN is now this tab's to turn off when it closes.
+          if (vpn.vpnDisconnect && !tab.vpnDisconnectCmd) tab.vpnDisconnectCmd = vpn.vpnDisconnect;
+        }
+      } catch {
+        // The VPN step is best effort; fall through to the normal retry.
+      }
+    }
     if (reach.state === "offline") {
       const delay = Math.min(2 ** c.attempt, MAX_BACKOFF_S);
       if (c.state !== "offline")
@@ -646,7 +683,10 @@ export class TabManager {
       // Reset the backoff only once the connection has proven itself.
       const started = c.startedAt;
       window.setTimeout(() => {
-        if (c.startedAt === started && c.state === "connected") c.attempt = 0;
+        if (c.startedAt === started && c.state === "connected") {
+          c.attempt = 0;
+          c.vpnTriedAt = undefined;
+        }
       }, QUICK_EXIT_MS);
     } catch (err) {
       session.notice(t("tabs.reconnectErrorNotice", { error: String(err) }));

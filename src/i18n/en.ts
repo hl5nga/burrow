@@ -390,6 +390,7 @@ const en: Loose<typeof ko> = {
       "[Couldn't reconnect — check authentication or host settings] Enter: retry · ⌘W: close tab",
     droppedRetryNotice: "[Connection dropped · reconnecting in {{delay}}s] Enter: connect now",
     unreachableRetryNotice: "[Host unreachable · {{reason}}] Still checking · Enter: check now",
+    vpnReconnectNotice: "[Host unreachable · trying to bring the VPN back up]",
     reconnectingNotice: "[Reconnecting…]",
     reconnectErrorNotice: "[Couldn't reconnect: {{error}}] Enter: retry",
   },
