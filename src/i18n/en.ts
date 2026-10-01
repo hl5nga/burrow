@@ -178,6 +178,8 @@ const en: Loose<typeof ko> = {
     connectionConnecting: "Connecting…",
     connectionReconnecting: "Reconnecting…",
     connectionOffline: "Offline",
+    reconnectHint: "Press to reconnect now",
+    reconnectingNow: "Reconnecting now…",
     connectionStopped: "Disconnected",
     moshTitle: "Mosh: the session stays alive across network changes",
     sshTitle: "SSH: automatically reconnects if it drops",

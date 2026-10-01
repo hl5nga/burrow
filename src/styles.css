@@ -342,6 +342,19 @@ body::after {
   border-color: color-mix(in srgb, var(--status-red) 35%, transparent);
 }
 
+/* Down or retrying: the chip reconnects when pressed. */
+.statusbar .seg.transport[data-state="reconnecting"],
+.statusbar .seg.transport[data-state="offline"],
+.statusbar .seg.transport[data-state="stopped"] {
+  cursor: pointer;
+}
+
+.statusbar .seg.transport[data-state="reconnecting"]:hover,
+.statusbar .seg.transport[data-state="offline"]:hover,
+.statusbar .seg.transport[data-state="stopped"]:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
 .statusbar .seg[hidden] {
   display: none;
 }

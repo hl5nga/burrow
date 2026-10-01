@@ -305,6 +305,21 @@ export class TabManager {
   }
 
   /** Mosh roams on its own; SSH tabs that are waiting to reconnect retry now. */
+  /**
+   * The status-bar chip: reconnect the active tab right now, like pressing
+   * Enter in a dropped tab. False when there is nothing to reconnect.
+   */
+  reconnectNow(): boolean {
+    const tab = this.active;
+    const c = tab?.connection;
+    if (!tab || !c || c.state === "connected" || c.state === "connecting") return false;
+    window.clearTimeout(c.timer);
+    c.attempt = 0;
+    c.quickFailures = 0;
+    this.scheduleReconnect(tab, 0);
+    return true;
+  }
+
   networkChanged() {
     const connections = this.tabs.flatMap((t) => (t.connection ? [t.connection] : []));
     if (connections.some((c) => c.transport === "mosh")) {

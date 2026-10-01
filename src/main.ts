@@ -16,6 +16,7 @@ import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
 import { UsageMonitor } from "./ui/usage-chip";
 import { TaskPanel } from "./ui/task-panel";
+import { showToast } from "./ui/toast";
 import { AgentMonitor } from "./ui/agents";
 import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
@@ -103,9 +104,18 @@ function showConnection(connection: Connection | undefined) {
   const state = connectionStateLabel(connection.state);
   status.transport.textContent = state ? `${name} · ${state}` : name;
   status.transport.dataset.state = connection.state;
-  status.transport.title =
-    connection.transport === "mosh" ? t("statusbar.moshTitle") : t("statusbar.sshTitle");
+  // Down (or retrying): the chip is a button that reconnects right now.
+  const down = connection.state !== "connected" && connection.state !== "connecting";
+  if (down) status.transport.textContent += " · ↻";
+  status.transport.title = down
+    ? t("statusbar.reconnectHint")
+    : connection.transport === "mosh"
+      ? t("statusbar.moshTitle")
+      : t("statusbar.sshTitle");
 }
+status.transport.addEventListener("click", () => {
+  if (tabs.reconnectNow()) showToast(t("statusbar.reconnectingNow"));
+});
 
 function showContext(context: SessionContext | undefined) {
   lastContext = context;

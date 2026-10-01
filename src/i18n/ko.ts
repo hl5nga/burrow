@@ -169,6 +169,8 @@ export default {
     connectionConnecting: "연결 중…",
     connectionReconnecting: "재연결 중…",
     connectionOffline: "오프라인",
+    reconnectHint: "클릭하면 지금 바로 다시 연결합니다",
+    reconnectingNow: "바로 다시 연결합니다…",
     connectionStopped: "끊김",
     moshTitle: "Mosh: 네트워크가 바뀌어도 세션이 유지됩니다",
     sshTitle: "SSH: 끊기면 자동으로 다시 연결합니다",
