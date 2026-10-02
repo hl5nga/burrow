@@ -1,6 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { copyText } from "./clipboard";
-import { highlight, htmlFrame, jsonTree, languageFor, renderMarkdown } from "./doc-render";
+import {
+  highlight,
+  htmlFrame,
+  inlineHtmlAssets,
+  jsonTree,
+  languageFor,
+  renderMarkdown,
+} from "./doc-render";
 import type { ActiveTarget } from "./guardrail-manager";
 import type { TerminalSession } from "../terminal/session";
 import { showToast } from "./toast";
@@ -303,7 +310,20 @@ export class FileBrowser {
         return doc;
       };
     } else if (lower.endsWith(".html") || lower.endsWith(".htm")) {
-      rendered = () => htmlFrame(text);
+      // Linked stylesheets and pictures from the page's own folder are read
+      // and inlined first; the preview can't fetch anything itself.
+      const profileId = target.profileId ?? null;
+      const page = await inlineHtmlAssets(
+        text,
+        path,
+        (p) =>
+          invoke<FileContent>("fs_read", { profileId, path: p }).then(
+            (c) => (c.kind === "text" ? c.text : undefined),
+            () => undefined,
+          ),
+        (p) => invoke<string>("fs_read_data_uri", { profileId, path: p }).catch(() => undefined),
+      ).catch(() => text);
+      rendered = () => htmlFrame(page);
     } else if (lower.endsWith(".json")) {
       rendered = () => {
         try {

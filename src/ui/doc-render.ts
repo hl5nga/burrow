@@ -33,18 +33,94 @@ export function renderMarkdown(text: string): string {
 }
 
 /**
- * An HTML file shown in an iframe with an empty sandbox (no scripts, no
- * same-origin) plus a CSP that blocks every fetch except inline styles and
- * data: images.
+ * An HTML file shown in an iframe. Scripts never run (the sandbox has no
+ * `allow-scripts`) and a CSP blocks every fetch except inline styles and
+ * data: images. `allow-same-origin` is safe without scripts and lets the app
+ * read the text selected in the frame, so ⌘C can copy it.
  */
 export function htmlFrame(text: string): HTMLIFrameElement {
   const frame = document.createElement("iframe");
-  frame.setAttribute("sandbox", "");
+  frame.setAttribute("sandbox", "allow-same-origin");
   frame.setAttribute("referrerpolicy", "no-referrer");
   frame.srcdoc =
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">` +
     text;
   return frame;
+}
+
+/**
+ * The absolute path a relative `href`/`src` in an HTML file points to, only
+ * when it stays inside the HTML file's own folder (assets/app.css, img/a.png,
+ * ./x.css). URLs with a scheme, absolute paths and anything that climbs out of
+ * the folder yield undefined: a page must not make the viewer read arbitrary
+ * files.
+ */
+export function resolveAssetPath(htmlPath: string, ref: string): string | undefined {
+  const clean = ref.trim().split(/[?#]/)[0];
+  if (
+    !clean ||
+    /^[a-z][a-z0-9+.-]*:/i.test(clean) ||
+    clean.startsWith("/") ||
+    clean.includes("\\")
+  ) {
+    return undefined;
+  }
+  const dir = htmlPath.split("/").slice(0, -1);
+  const parts = [...dir];
+  const base = dir.length;
+  for (const piece of clean.split("/")) {
+    if (piece === "" || piece === ".") continue;
+    if (piece === "..") {
+      if (parts.length <= base) return undefined; // would leave the HTML's folder
+      parts.pop();
+    } else {
+      parts.push(piece);
+    }
+  }
+  return parts.length > base ? parts.join("/") : undefined;
+}
+
+const MAX_INLINED = 12;
+
+/**
+ * Inlines what a page links from its own folder — stylesheets as <style>,
+ * small pictures as data: URIs — since the preview itself may fetch nothing.
+ * The page's scripts are left alone (and never run). A reference that can't
+ * be read is just skipped.
+ */
+export async function inlineHtmlAssets(
+  html: string,
+  htmlPath: string,
+  readText: (path: string) => Promise<string | undefined>,
+  readImage: (path: string) => Promise<string | undefined>,
+): Promise<string> {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const jobs: Promise<void>[] = [];
+  let budget = MAX_INLINED;
+  for (const link of doc.querySelectorAll<HTMLLinkElement>("link[rel~='stylesheet'][href]")) {
+    const path = resolveAssetPath(htmlPath, link.getAttribute("href") ?? "");
+    if (!path || budget-- <= 0) continue;
+    jobs.push(
+      readText(path).then((css) => {
+        if (css === undefined) return;
+        const style = doc.createElement("style");
+        style.textContent = css;
+        link.replaceWith(style);
+      }),
+    );
+  }
+  for (const img of doc.querySelectorAll<HTMLImageElement>("img[src]")) {
+    const path = resolveAssetPath(htmlPath, img.getAttribute("src") ?? "");
+    if (!path || budget-- <= 0) continue;
+    jobs.push(
+      readImage(path).then((uri) => {
+        if (uri !== undefined) img.setAttribute("src", uri);
+      }),
+    );
+  }
+  await Promise.all(jobs);
+  const type = doc.doctype ? `<!doctype ${doc.doctype.name}>` : "";
+  return type + doc.documentElement.outerHTML;
 }
 
 const EXT_LANG: Record<string, string> = {

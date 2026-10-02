@@ -195,6 +195,63 @@ pub fn fs_read(
     }
 }
 
+/// Pictures an HTML preview may inline. Bigger ones are left out.
+const MAX_ASSET: u64 = 1024 * 1024;
+
+fn image_mime(path: &str) -> Option<&'static str> {
+    let ext = path.rsplit('.').next()?.to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        _ => return None,
+    })
+}
+
+/// A small picture next to an HTML file as a `data:` URI, so the sandboxed
+/// preview (which may fetch nothing) can show it.
+#[tauri::command(async)]
+pub fn fs_read_data_uri(
+    store: tauri::State<'_, Arc<Store>>,
+    profile_id: Option<String>,
+    path: String,
+) -> Result<String, String> {
+    check_path(&path)?;
+    let mime = image_mime(&path).ok_or("지원하지 않는 이미지 형식입니다")?;
+    let b64 = match profile_id {
+        None => {
+            let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+            if !meta.is_file() || meta.len() > MAX_ASSET {
+                return Err("이미지가 너무 크거나 파일이 아닙니다".into());
+            }
+            crate::tmux::base64(&std::fs::read(&path).map_err(|e| e.to_string())?)
+        }
+        Some(id) => {
+            let profile = remote::load_profile(&store, &id)?;
+            let script = format!(
+                "f={p}; [ -f \"$f\" ] || {{ echo 'burrow:not-a-file'; exit 0; }}; \
+                 s=$(wc -c < \"$f\" | tr -d ' '); echo \"burrow:size:$s\"; \
+                 if [ \"$s\" -le {MAX_ASSET} ]; then base64 < \"$f\" | tr -d '\\n'; fi",
+                p = quote(&path)
+            );
+            let out = remote::side_command(&store, &profile, &script, None)?;
+            let (head, body) = out.split_once('\n').unwrap_or((&out, ""));
+            let size: u64 = head
+                .strip_prefix("burrow:size:")
+                .and_then(|s| s.parse().ok())
+                .ok_or("원격 이미지를 읽지 못했습니다")?;
+            if size > MAX_ASSET {
+                return Err("이미지가 너무 큽니다".into());
+            }
+            body.trim().to_string()
+        }
+    };
+    Ok(format!("data:{mime};base64,{b64}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,6 +310,14 @@ mod tests {
             format!("burrow:size:{}", MAX_PREVIEW + 1)
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn only_small_picture_types_are_inlined() {
+        assert_eq!(image_mime("/a/b/logo.PNG"), Some("image/png"));
+        assert_eq!(image_mime("/a/icon.svg"), Some("image/svg+xml"));
+        assert_eq!(image_mime("/a/notes.txt"), None);
+        assert_eq!(image_mime("/a/noext"), None);
     }
 
     #[test]

@@ -17,6 +17,7 @@ import { ResourceMonitor } from "./ui/resource-chip";
 import { UsageMonitor } from "./ui/usage-chip";
 import { TaskPanel } from "./ui/task-panel";
 import { showToast } from "./ui/toast";
+import { copyText, selectedText } from "./ui/clipboard";
 import { AgentMonitor } from "./ui/agents";
 import { GuardrailPrompt } from "./ui/guardrail-prompt";
 import { GuardrailManager } from "./ui/guardrail-manager";
@@ -431,9 +432,16 @@ void listen("menu-view-startup", () => void viewStartup());
 // own selection, anything else (a text field) copies natively.
 void listen("menu-copy", () => {
   void (async () => {
-    // A terminal selection wins; otherwise it's a text field's own selection.
+    // Focus outside the terminal (a document in the viewer, a field): copy the
+    // page's selection — an old terminal selection behind the viewer must not
+    // win. Written natively: the webview refuses its own clipboard API for a
+    // copy that came from the menu.
+    const inTerminal = !!(document.activeElement as HTMLElement | null)?.closest?.(".xterm");
+    const page = inTerminal ? "" : selectedText();
+    if (page) return void (await copyText(page));
     if (await activeSession()?.copySelection()) return;
-    document.execCommand("copy");
+    const text = selectedText();
+    if (text) await copyText(text);
   })();
 });
 void listen("menu-about", () => void showAbout());

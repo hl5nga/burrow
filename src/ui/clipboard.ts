@@ -26,3 +26,25 @@ export async function copyText(text: string): Promise<void> {
   area.remove();
   if (!ok) throw new Error("clipboard unavailable");
 }
+
+/**
+ * What the user has selected outside the terminal: a field's text, the text
+ * selected inside the document preview's frame, or a plain page selection
+ * (Markdown, source view, panels). Empty when nothing is selected.
+ */
+export function selectedText(): string {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+    const { selectionStart: start, selectionEnd: end } = active;
+    if (start !== null && end !== null && end > start) return active.value.slice(start, end);
+  }
+  if (active instanceof HTMLIFrameElement) {
+    try {
+      const text = active.contentWindow?.getSelection()?.toString();
+      if (text) return text;
+    } catch {
+      // A frame from another origin: nothing readable.
+    }
+  }
+  return window.getSelection()?.toString() ?? "";
+}
