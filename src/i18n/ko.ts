@@ -242,12 +242,10 @@ export default {
     sortAsc: "오름차순 (작은/오래된 것 먼저) — 누르면 바뀝니다",
     sortDesc: "내림차순 (큰/최근 것 먼저) — 누르면 바뀝니다",
     sort: {
-      status: "상태별",
       serial: "번호",
       created: "생성일",
       completed: "완료일",
       updated: "수정일",
-      priority: "우선순위",
     },
     date: { created: "생성", completed: "완료", updated: "수정" },
     empty: "작업이 없습니다. 위에서 제목을 입력해 추가하세요.",

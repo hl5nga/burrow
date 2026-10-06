@@ -7,9 +7,11 @@ import { chooseDialog } from "./dialog";
 import {
   blankTask,
   DEFAULT_DIR,
+  DEFAULT_SORT,
   rowDate,
   SORT_KEYS,
   takeSerial,
+  validSort,
   withStatus,
   type SortKey,
   type TaskFilter,
@@ -66,7 +68,7 @@ export class TaskPanel {
   private file: TasksFile = { version: 1, projects: [], tasks: [], selectedProject: null };
   private loaded = false;
   private filter: TaskFilter = "open";
-  private sort: TaskSort = { key: "status", dir: "asc" };
+  private sort: TaskSort = { ...DEFAULT_SORT };
   private expanded: string | null = null;
   private saveTimer = 0;
   /** Finished-looking tasks the user hasn't confirmed or dismissed yet. */
@@ -222,10 +224,7 @@ export class TaskPanel {
     try {
       const filter = localStorage.getItem(FILTER_KEY);
       if (filter === "open" || filter === "done" || filter === "all") this.filter = filter;
-      const sort = JSON.parse(localStorage.getItem(SORT_KEY) ?? "null") as TaskSort | null;
-      if (sort && SORT_KEYS.includes(sort.key) && (sort.dir === "asc" || sort.dir === "desc")) {
-        this.sort = sort;
-      }
+      this.sort = validSort(JSON.parse(localStorage.getItem(SORT_KEY) ?? "null"));
     } catch {
       // Remembering the list view is a convenience only.
     }

@@ -251,12 +251,10 @@ const en: Loose<typeof ko> = {
     sortAsc: "Ascending (smaller/older first) — press to flip",
     sortDesc: "Descending (bigger/newer first) — press to flip",
     sort: {
-      status: "By status",
       serial: "Number",
       created: "Created",
       completed: "Completed",
       updated: "Updated",
-      priority: "Priority",
     },
     date: { created: "Created", completed: "Done", updated: "Updated" },
     empty: "No tasks yet. Type a title above to add one.",

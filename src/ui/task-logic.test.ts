@@ -8,6 +8,7 @@ import {
   recordAssignment,
   rowDate,
   takeSerial,
+  validSort,
   visibleTasks,
   withStatus,
   type Target,
@@ -117,7 +118,7 @@ const mk = (
 });
 const ids = (tasks: Task[]) => tasks.map((x) => x.id);
 
-test("list: this project only, grouped by status by default, filters open/done/all", () => {
+test("list: this project only; default order is by number, lowest first; filters open/done/all", () => {
   const tasks = [
     mk("done1", 1, "done", "high", 1, { completedAt: 50 }),
     mk("todo-low", 2, "todo", "low", 2),
@@ -127,13 +128,13 @@ test("list: this project only, grouped by status by default, filters open/done/a
     mk("hold", 6, "hold", "high", 6),
   ];
   assert.deepEqual(ids(visibleTasks(tasks, "p", "all")), [
-    "doing",
-    "todo-high",
-    "todo-low",
-    "hold",
     "done1",
+    "todo-low",
+    "todo-high",
+    "doing",
+    "hold",
   ]);
-  assert.deepEqual(ids(visibleTasks(tasks, "p", "open")), ["doing", "todo-high", "todo-low"]);
+  assert.deepEqual(ids(visibleTasks(tasks, "p", "open")), ["todo-low", "todo-high", "doing"]);
   assert.deepEqual(ids(visibleTasks(tasks, "p", "done")), ["done1"]);
 });
 
@@ -178,9 +179,18 @@ test("row date follows the sort; a done task shows when it was completed", () =>
   const done = mk("a", 1, "done", "normal", 100, { completedAt: 700, updatedAt: 800 });
   const open = mk("b", 2, "todo", "normal", 200, { updatedAt: 300 });
   const by = (key: never) => ({ key, dir: "desc" as const });
-  assert.deepEqual(rowDate(done, by("status" as never)), { kind: "completed", at: 700 });
-  assert.deepEqual(rowDate(open, by("status" as never)), { kind: "created", at: 200 });
+  assert.deepEqual(rowDate(done, by("serial" as never)), { kind: "completed", at: 700 });
+  assert.deepEqual(rowDate(open, by("serial" as never)), { kind: "created", at: 200 });
   assert.deepEqual(rowDate(done, by("created" as never)), { kind: "created", at: 100 });
   assert.deepEqual(rowDate(open, by("completed" as never)), { kind: "created", at: 200 });
   assert.deepEqual(rowDate(done, by("updated" as never)), { kind: "updated", at: 800 });
+});
+
+test("a saved sort must be one of today's choices, else number ascending", () => {
+  assert.deepEqual(validSort({ key: "completed", dir: "desc" }), { key: "completed", dir: "desc" });
+  // Older builds also saved these.
+  assert.deepEqual(validSort({ key: "status", dir: "asc" }), { key: "serial", dir: "asc" });
+  assert.deepEqual(validSort({ key: "priority", dir: "desc" }), { key: "serial", dir: "asc" });
+  assert.deepEqual(validSort({ key: "serial", dir: "sideways" }), { key: "serial", dir: "asc" });
+  assert.deepEqual(validSort(null), { key: "serial", dir: "asc" });
 });

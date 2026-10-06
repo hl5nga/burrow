@@ -164,42 +164,25 @@ export function assessAssign(
   return out;
 }
 
-const STATUS_ORDER: TaskStatus[] = ["doing", "review", "todo", "hold", "done"];
-const PRIORITY_ORDER: TaskPriority[] = ["high", "normal", "low"];
-
 export type TaskFilter = "open" | "done" | "all";
-export type SortKey = "status" | "serial" | "created" | "completed" | "updated" | "priority";
-export const SORT_KEYS: SortKey[] = [
-  "status",
-  "serial",
-  "created",
-  "completed",
-  "updated",
-  "priority",
-];
+export type SortKey = "serial" | "created" | "completed" | "updated";
+export const SORT_KEYS: SortKey[] = ["serial", "created", "completed", "updated"];
 export interface TaskSort {
   key: SortKey;
   /** "asc" = smallest/oldest first. */
   dir: "asc" | "desc";
 }
 
-/** What each sort key does on its first pick: newest/biggest numbers first, except status. */
+/** The list order when nothing was chosen yet: by number, lowest first. */
+export const DEFAULT_SORT: TaskSort = { key: "serial", dir: "asc" };
+
+/** The direction a sort key starts with when picked: numbers ascending, dates newest first. */
 export const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
-  status: "asc",
-  serial: "desc",
+  serial: "asc",
   created: "desc",
   completed: "desc",
   updated: "desc",
-  priority: "asc",
 };
-
-function byStatus(a: Task, b: Task): number {
-  return (
-    STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
-    PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority) ||
-    a.createdAt - b.createdAt
-  );
-}
 
 /** Tasks that have no value for the key (not completed yet) always sort last. */
 function compare(sort: TaskSort): (a: Task, b: Task) => number {
@@ -213,8 +196,6 @@ function compare(sort: TaskSort): (a: Task, b: Task) => number {
     return sign * (x - y) || a.serial - b.serial;
   };
   switch (sort.key) {
-    case "status":
-      return (a, b) => sign * byStatus(a, b);
     case "serial":
       return num((t) => t.serial);
     case "created":
@@ -223,10 +204,6 @@ function compare(sort: TaskSort): (a: Task, b: Task) => number {
       return num((t) => t.completedAt);
     case "updated":
       return num((t) => t.updatedAt);
-    case "priority":
-      return (a, b) =>
-        sign * (PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)) ||
-        byStatus(a, b);
   }
 }
 
@@ -235,7 +212,7 @@ export function visibleTasks(
   tasks: Task[],
   projectId: string | null,
   filter: TaskFilter,
-  sort: TaskSort = { key: "status", dir: "asc" },
+  sort: TaskSort = DEFAULT_SORT,
 ): Task[] {
   return tasks
     .filter((x) => x.projectId === projectId)
@@ -249,18 +226,22 @@ export function visibleTasks(
     .sort(compare(sort));
 }
 
-/** The date a row shows, following the sort: completion, update, or (default) creation — a done task shows when it was completed. */
+/** A saved sort if it is one of today's choices (older builds also offered status and priority); otherwise the default. */
+export function validSort(value: unknown): TaskSort {
+  const v = value as Partial<TaskSort> | null;
+  return v && SORT_KEYS.includes(v.key as SortKey) && (v.dir === "asc" || v.dir === "desc")
+    ? { key: v.key as SortKey, dir: v.dir }
+    : { ...DEFAULT_SORT };
+}
+
+/** The date a row shows, following the sort: completion, update, or creation — a done task shows when it was completed. */
 export function rowDate(
   task: Task,
   sort: TaskSort,
 ): { kind: "created" | "completed" | "updated"; at: number } {
   if (sort.key === "updated") return { kind: "updated", at: task.updatedAt };
-  if (
-    sort.key === "completed" ||
-    (sort.key !== "created" && task.status === "done" && task.completedAt)
-  ) {
-    if (task.completedAt) return { kind: "completed", at: task.completedAt };
-  }
+  if (sort.key !== "created" && task.completedAt)
+    return { kind: "completed", at: task.completedAt };
   return { kind: "created", at: task.createdAt };
 }
 
