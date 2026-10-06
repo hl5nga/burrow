@@ -546,6 +546,9 @@ pub struct TaskProject {
     /// Prompt sent on Assign; `{title}`, `{description}` and `{doc}` are filled
     /// in. Empty = the built-in wording.
     pub template: String,
+    /// The serial number the next task of this project gets. Numbers are never
+    /// reused, even after a task is deleted.
+    pub next_serial: u32,
 }
 
 /// One time a task was sent to an agent.
@@ -569,6 +572,8 @@ pub struct TaskAssignment {
 pub struct Task {
     pub id: String,
     pub project_id: String,
+    /// Short number within the project (#12): stable, never reused.
+    pub serial: u32,
     pub title: String,
     /// Markdown.
     pub description: String,
@@ -582,6 +587,8 @@ pub struct Task {
     pub doc_path: String,
     pub created_at: u64,
     pub updated_at: u64,
+    /// When the status last became `done` (unix ms); None while not done.
+    pub completed_at: Option<u64>,
     pub assignments: Vec<TaskAssignment>,
 }
 
@@ -604,6 +611,48 @@ impl Default for TasksFile {
             tasks: Vec::new(),
             selected_project: None,
         }
+    }
+}
+
+impl TasksFile {
+    /// Fills in what files from before serial numbers and completion times
+    /// lack: numbers by creation order within each project, and for tasks
+    /// already done a completion time taken from their last change (the best
+    /// available guess). True if anything changed.
+    pub fn backfill(&mut self) -> bool {
+        let mut changed = false;
+        for project in &mut self.projects {
+            let mut ids: Vec<usize> = self
+                .tasks
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| t.project_id == project.id)
+                .map(|(i, _)| i)
+                .collect();
+            ids.sort_by_key(|&i| self.tasks[i].created_at);
+            let mut next = project
+                .next_serial
+                .max(ids.iter().map(|&i| self.tasks[i].serial).max().unwrap_or(0) + 1)
+                .max(1);
+            for &i in &ids {
+                if self.tasks[i].serial == 0 {
+                    self.tasks[i].serial = next;
+                    next += 1;
+                    changed = true;
+                }
+            }
+            if project.next_serial != next {
+                project.next_serial = next;
+                changed = true;
+            }
+        }
+        for task in &mut self.tasks {
+            if task.status == "done" && task.completed_at.is_none() {
+                task.completed_at = Some(task.updated_at);
+                changed = true;
+            }
+        }
+        changed
     }
 }
 

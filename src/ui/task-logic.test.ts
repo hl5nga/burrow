@@ -6,8 +6,12 @@ import {
   buildPrompt,
   pickTarget,
   recordAssignment,
+  rowDate,
+  takeSerial,
   visibleTasks,
+  withStatus,
   type Target,
+  type Task,
 } from "./task-logic.ts";
 
 const defaults = {
@@ -97,33 +101,86 @@ test("assign moves todo/done to doing but keeps review/hold", () => {
   assert.equal(recordAssignment(base, e).assignments.length, 1);
 });
 
-test("list: only this project, active first, optionally hiding done/hold", () => {
-  const mk = (
-    id: string,
-    status: string,
-    priority: string,
-    createdAt: number,
-    projectId = "p",
-  ) => ({
-    ...blankTask(projectId, id, createdAt),
-    id,
-    status: status as never,
-    priority: priority as never,
-  });
+const mk = (
+  id: string,
+  serial: number,
+  status: string,
+  priority: string,
+  createdAt: number,
+  extra: Partial<Task> = {},
+): Task => ({
+  ...blankTask("p", id, serial, createdAt),
+  id,
+  status: status as never,
+  priority: priority as never,
+  ...extra,
+});
+const ids = (tasks: Task[]) => tasks.map((x) => x.id);
+
+test("list: this project only, grouped by status by default, filters open/done/all", () => {
   const tasks = [
-    mk("done1", "done", "high", 1),
-    mk("todo-low", "todo", "low", 2),
-    mk("todo-high", "todo", "high", 3),
-    mk("doing", "doing", "low", 4),
-    mk("other", "todo", "high", 5, "q"),
-    mk("hold", "hold", "high", 6),
+    mk("done1", 1, "done", "high", 1, { completedAt: 50 }),
+    mk("todo-low", 2, "todo", "low", 2),
+    mk("todo-high", 3, "todo", "high", 3),
+    mk("doing", 4, "doing", "low", 4),
+    { ...mk("other", 5, "todo", "high", 5), projectId: "q" },
+    mk("hold", 6, "hold", "high", 6),
   ];
-  assert.deepEqual(
-    visibleTasks(tasks, "p", false).map((x) => x.id),
-    ["doing", "todo-high", "todo-low", "hold", "done1"],
-  );
-  assert.deepEqual(
-    visibleTasks(tasks, "p", true).map((x) => x.id),
-    ["doing", "todo-high", "todo-low"],
-  );
+  assert.deepEqual(ids(visibleTasks(tasks, "p", "all")), [
+    "doing",
+    "todo-high",
+    "todo-low",
+    "hold",
+    "done1",
+  ]);
+  assert.deepEqual(ids(visibleTasks(tasks, "p", "open")), ["doing", "todo-high", "todo-low"]);
+  assert.deepEqual(ids(visibleTasks(tasks, "p", "done")), ["done1"]);
+});
+
+test("sort: by serial, creation, completion and update, both directions", () => {
+  const tasks = [
+    mk("a", 1, "done", "normal", 300, { completedAt: 900, updatedAt: 950 }),
+    mk("b", 2, "todo", "normal", 100, { updatedAt: 100 }),
+    mk("c", 3, "done", "normal", 200, { completedAt: 500, updatedAt: 500 }),
+    mk("d", 4, "doing", "normal", 400, { updatedAt: 800 }),
+  ];
+  const sorted = (key: never, dir: "asc" | "desc") =>
+    ids(visibleTasks(tasks, "p", "all", { key, dir }));
+  assert.deepEqual(sorted("serial" as never, "asc"), ["a", "b", "c", "d"]);
+  assert.deepEqual(sorted("serial" as never, "desc"), ["d", "c", "b", "a"]);
+  assert.deepEqual(sorted("created" as never, "asc"), ["b", "c", "a", "d"]);
+  assert.deepEqual(sorted("created" as never, "desc"), ["d", "a", "c", "b"]);
+  // Not completed yet = last, whichever way it goes (then by serial).
+  assert.deepEqual(sorted("completed" as never, "desc"), ["a", "c", "b", "d"]);
+  assert.deepEqual(sorted("completed" as never, "asc"), ["c", "a", "b", "d"]);
+  assert.deepEqual(sorted("updated" as never, "desc"), ["a", "d", "c", "b"]);
+});
+
+test("serials count up and are never reused", () => {
+  const project = { nextSerial: 0 };
+  assert.deepEqual([takeSerial(project), takeSerial(project), takeSerial(project)], [1, 2, 3]);
+  assert.equal(project.nextSerial, 4);
+});
+
+test("status changes keep the completion time right", () => {
+  const t = mk("a", 1, "todo", "normal", 1);
+  const done = withStatus(t, "done", 500);
+  assert.equal(done.completedAt, 500);
+  // Staying done doesn't move the completion time; reopening clears it.
+  assert.equal(withStatus(done, "done", 900).completedAt, 500);
+  assert.equal(withStatus(done, "doing", 900).completedAt, null);
+  // Assign reopens a finished task.
+  const e = { paneId: "%1", label: "be", at: 1, text: "t", submitted: true };
+  assert.equal(recordAssignment(done, e, 900).completedAt, null);
+});
+
+test("row date follows the sort; a done task shows when it was completed", () => {
+  const done = mk("a", 1, "done", "normal", 100, { completedAt: 700, updatedAt: 800 });
+  const open = mk("b", 2, "todo", "normal", 200, { updatedAt: 300 });
+  const by = (key: never) => ({ key, dir: "desc" as const });
+  assert.deepEqual(rowDate(done, by("status" as never)), { kind: "completed", at: 700 });
+  assert.deepEqual(rowDate(open, by("status" as never)), { kind: "created", at: 200 });
+  assert.deepEqual(rowDate(done, by("created" as never)), { kind: "created", at: 100 });
+  assert.deepEqual(rowDate(open, by("completed" as never)), { kind: "created", at: 200 });
+  assert.deepEqual(rowDate(done, by("updated" as never)), { kind: "updated", at: 800 });
 });

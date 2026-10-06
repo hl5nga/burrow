@@ -17,6 +17,8 @@ export interface TaskAssignment {
 export interface Task {
   id: string;
   projectId: string;
+  /** Short number within the project (#12): stable, never reused. */
+  serial: number;
   title: string;
   description: string;
   status: TaskStatus;
@@ -25,6 +27,8 @@ export interface Task {
   docPath: string;
   createdAt: number;
   updatedAt: number;
+  /** When the status last became "done"; null while it isn't. */
+  completedAt: number | null;
   assignments: TaskAssignment[];
 }
 
@@ -34,6 +38,8 @@ export interface TaskProject {
   profileId: string | null;
   tmuxSession: string | null;
   template: string;
+  /** The serial number the next task of this project gets. */
+  nextSerial: number;
 }
 
 export interface TasksFile {
@@ -57,10 +63,11 @@ export function newId(): string {
   return crypto.randomUUID();
 }
 
-export function blankTask(projectId: string, title: string, now = Date.now()): Task {
+export function blankTask(projectId: string, title: string, serial = 0, now = Date.now()): Task {
   return {
     id: newId(),
     projectId,
+    serial,
     title,
     description: "",
     status: "todo",
@@ -69,7 +76,28 @@ export function blankTask(projectId: string, title: string, now = Date.now()): T
     docPath: "",
     createdAt: now,
     updatedAt: now,
+    completedAt: null,
     assignments: [],
+  };
+}
+
+/** The next free serial of the project, advancing its counter. */
+export function takeSerial(project: Pick<TaskProject, "nextSerial">): number {
+  const serial = Math.max(1, project.nextSerial || 1);
+  project.nextSerial = serial + 1;
+  return serial;
+}
+
+/**
+ * Every status change goes through here so the completion time stays right:
+ * set when a task becomes done, cleared when it is reopened.
+ */
+export function withStatus(task: Task, status: TaskStatus, now = Date.now()): Task {
+  return {
+    ...task,
+    status,
+    completedAt: status === "done" ? (task.status === "done" ? task.completedAt : now) : null,
+    updatedAt: now,
   };
 }
 
@@ -139,25 +167,106 @@ export function assessAssign(
 const STATUS_ORDER: TaskStatus[] = ["doing", "review", "todo", "hold", "done"];
 const PRIORITY_ORDER: TaskPriority[] = ["high", "normal", "low"];
 
-/** Tasks of a project for the list: active ones first, then by priority and age. */
-export function visibleTasks(tasks: Task[], projectId: string | null, onlyOpen: boolean): Task[] {
+export type TaskFilter = "open" | "done" | "all";
+export type SortKey = "status" | "serial" | "created" | "completed" | "updated" | "priority";
+export const SORT_KEYS: SortKey[] = [
+  "status",
+  "serial",
+  "created",
+  "completed",
+  "updated",
+  "priority",
+];
+export interface TaskSort {
+  key: SortKey;
+  /** "asc" = smallest/oldest first. */
+  dir: "asc" | "desc";
+}
+
+/** What each sort key does on its first pick: newest/biggest numbers first, except status. */
+export const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
+  status: "asc",
+  serial: "desc",
+  created: "desc",
+  completed: "desc",
+  updated: "desc",
+  priority: "asc",
+};
+
+function byStatus(a: Task, b: Task): number {
+  return (
+    STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
+    PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority) ||
+    a.createdAt - b.createdAt
+  );
+}
+
+/** Tasks that have no value for the key (not completed yet) always sort last. */
+function compare(sort: TaskSort): (a: Task, b: Task) => number {
+  const sign = sort.dir === "asc" ? 1 : -1;
+  const num = (get: (t: Task) => number | null) => (a: Task, b: Task) => {
+    const x = get(a);
+    const y = get(b);
+    if (x === null && y === null) return a.serial - b.serial;
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return sign * (x - y) || a.serial - b.serial;
+  };
+  switch (sort.key) {
+    case "status":
+      return (a, b) => sign * byStatus(a, b);
+    case "serial":
+      return num((t) => t.serial);
+    case "created":
+      return num((t) => t.createdAt);
+    case "completed":
+      return num((t) => t.completedAt);
+    case "updated":
+      return num((t) => t.updatedAt);
+    case "priority":
+      return (a, b) =>
+        sign * (PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)) ||
+        byStatus(a, b);
+  }
+}
+
+/** Tasks of a project for the list, filtered and sorted. */
+export function visibleTasks(
+  tasks: Task[],
+  projectId: string | null,
+  filter: TaskFilter,
+  sort: TaskSort = { key: "status", dir: "asc" },
+): Task[] {
   return tasks
     .filter((x) => x.projectId === projectId)
-    .filter((x) => !onlyOpen || (x.status !== "done" && x.status !== "hold"))
-    .sort(
-      (a, b) =>
-        STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
-        PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority) ||
-        a.createdAt - b.createdAt,
-    );
+    .filter((x) =>
+      filter === "all"
+        ? true
+        : filter === "done"
+          ? x.status === "done"
+          : x.status !== "done" && x.status !== "hold",
+    )
+    .sort(compare(sort));
+}
+
+/** The date a row shows, following the sort: completion, update, or (default) creation — a done task shows when it was completed. */
+export function rowDate(
+  task: Task,
+  sort: TaskSort,
+): { kind: "created" | "completed" | "updated"; at: number } {
+  if (sort.key === "updated") return { kind: "updated", at: task.updatedAt };
+  if (
+    sort.key === "completed" ||
+    (sort.key !== "created" && task.status === "done" && task.completedAt)
+  ) {
+    if (task.completedAt) return { kind: "completed", at: task.completedAt };
+  }
+  return { kind: "created", at: task.createdAt };
 }
 
 /** Applies what a successful Assign changes on the task. */
 export function recordAssignment(task: Task, entry: TaskAssignment, now = Date.now()): Task {
-  return {
-    ...task,
-    status: task.status === "done" ? "doing" : task.status === "todo" ? "doing" : task.status,
-    assignments: [...task.assignments, entry],
-    updatedAt: now,
-  };
+  const status: TaskStatus =
+    task.status === "done" || task.status === "todo" ? "doing" : task.status;
+  return { ...withStatus(task, status, now), assignments: [...task.assignments, entry] };
 }

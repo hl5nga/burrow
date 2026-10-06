@@ -6,6 +6,14 @@ import type { StoredCommand } from "./command-validation";
 import { chooseDialog } from "./dialog";
 import {
   blankTask,
+  DEFAULT_DIR,
+  rowDate,
+  SORT_KEYS,
+  takeSerial,
+  withStatus,
+  type SortKey,
+  type TaskFilter,
+  type TaskSort,
   newId,
   PRIORITIES,
   recordAssignment,
@@ -29,6 +37,16 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 const TRACK_MS = 8000;
+const FILTER_KEY = "burrow.taskFilter";
+const SORT_KEY = "burrow.taskSort";
+
+/** 10/02 within this year, 2025-10-02 otherwise. */
+function shortDate(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const md = `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}-${md}`;
+}
 
 const STATUS_MARK: Record<string, string> = {
   todo: "○",
@@ -47,7 +65,8 @@ export class TaskPanel {
   readonly element = el("div", "task-view");
   private file: TasksFile = { version: 1, projects: [], tasks: [], selectedProject: null };
   private loaded = false;
-  private onlyOpen = true;
+  private filter: TaskFilter = "open";
+  private sort: TaskSort = { key: "status", dir: "asc" };
   private expanded: string | null = null;
   private saveTimer = 0;
   /** Finished-looking tasks the user hasn't confirmed or dismissed yet. */
@@ -62,6 +81,7 @@ export class TaskPanel {
     private readonly activeProfileId: () => string | undefined,
   ) {
     this.element.hidden = true;
+    this.loadPrefs();
     onLocaleChange(() => this.render());
     agents.addUpdateListener(() => void this.onAgentsUpdate());
     // Hosts without an open tab aren't polled by the agent monitor; tasks
@@ -187,7 +207,7 @@ export class TaskPanel {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.isComposing && input.value.trim()) {
         e.preventDefault();
-        const task = blankTask(project.id, input.value.trim());
+        const task = blankTask(project.id, input.value.trim(), takeSerial(project));
         this.file.tasks.push(task);
         this.expanded = null;
         input.value = "";
@@ -198,21 +218,78 @@ export class TaskPanel {
     return input;
   }
 
+  private loadPrefs() {
+    try {
+      const filter = localStorage.getItem(FILTER_KEY);
+      if (filter === "open" || filter === "done" || filter === "all") this.filter = filter;
+      const sort = JSON.parse(localStorage.getItem(SORT_KEY) ?? "null") as TaskSort | null;
+      if (sort && SORT_KEYS.includes(sort.key) && (sort.dir === "asc" || sort.dir === "desc")) {
+        this.sort = sort;
+      }
+    } catch {
+      // Remembering the list view is a convenience only.
+    }
+  }
+
+  private savePrefs() {
+    try {
+      localStorage.setItem(FILTER_KEY, this.filter);
+      localStorage.setItem(SORT_KEY, JSON.stringify(this.sort));
+    } catch {
+      // Same: fine without it.
+    }
+  }
+
+  /** Changes a task's status with its completion time kept right. */
+  private setStatus(task: Task, status: Task["status"]) {
+    Object.assign(task, withStatus(task, status));
+    this.scheduleSave();
+  }
+
   private renderFilter(): HTMLElement {
-    const row = el("div", "task-filter");
-    for (const [open, label] of [
-      [true, t("tasks.filterOpen")],
-      [false, t("tasks.filterAll")],
+    const wrap = el("div", "task-controls");
+    const filters = el("div", "task-filter");
+    for (const [value, label] of [
+      ["open", t("tasks.filterOpen")],
+      ["done", t("tasks.filterDone")],
+      ["all", t("tasks.filterAll")],
     ] as const) {
       const b = el("button", "task-filter-btn", label);
-      b.classList.toggle("active", this.onlyOpen === open);
+      b.classList.toggle("active", this.filter === value);
       b.addEventListener("click", () => {
-        this.onlyOpen = open;
+        this.filter = value;
+        this.savePrefs();
         this.render();
       });
-      row.append(b);
+      filters.append(b);
     }
-    return row;
+    const sorting = el("div", "task-sort");
+    const select = el("select", "task-sort-select");
+    select.title = t("tasks.sortBy");
+    for (const key of SORT_KEYS) {
+      const o = el("option", undefined, t(`tasks.sort.${key}`));
+      o.value = key;
+      o.selected = key === this.sort.key;
+      select.append(o);
+    }
+    select.addEventListener("change", () => {
+      const key = select.value as SortKey;
+      this.sort = { key, dir: DEFAULT_DIR[key] };
+      // "Open" holds nothing that was completed: show them when sorting by it.
+      if (key === "completed" && this.filter === "open") this.filter = "all";
+      this.savePrefs();
+      this.render();
+    });
+    const dir = el("button", "task-sort-dir", this.sort.dir === "asc" ? "↑" : "↓");
+    dir.title = t(this.sort.dir === "asc" ? "tasks.sortAsc" : "tasks.sortDesc");
+    dir.addEventListener("click", () => {
+      this.sort = { ...this.sort, dir: this.sort.dir === "asc" ? "desc" : "asc" };
+      this.savePrefs();
+      this.render();
+    });
+    sorting.append(select, dir);
+    wrap.append(filters, sorting);
+    return wrap;
   }
 
   /** Re-render even while the add field has focus (it was just cleared). */
@@ -223,7 +300,7 @@ export class TaskPanel {
 
   private renderList(project: TaskProject): HTMLElement {
     const list = el("div", "task-list");
-    const tasks = visibleTasks(this.file.tasks, project.id, this.onlyOpen);
+    const tasks = visibleTasks(this.file.tasks, project.id, this.filter, this.sort);
     if (tasks.length === 0) {
       const any = this.file.tasks.some((x) => x.projectId === project.id);
       list.append(el("div", "task-empty", t(any ? "tasks.emptyFiltered" : "tasks.empty")));
@@ -239,13 +316,19 @@ export class TaskPanel {
     mark.title = t(`tasks.status.${task.status}`);
     mark.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.update(task, { status: task.status === "done" ? "todo" : "done" });
+      this.setStatus(task, task.status === "done" ? "todo" : "done");
       this.render();
     });
     const main = el("div", "task-main");
-    const title = el("div", "task-title", task.title);
+    const title = el("div", "task-title");
+    if (task.serial) title.append(el("span", "task-serial", `#${task.serial}`));
+    title.append(document.createTextNode(task.title));
     main.append(title);
     const meta = el("div", "task-meta");
+    const when = rowDate(task, this.sort);
+    const stamp = el("span", "task-date", `${t(`tasks.date.${when.kind}`)} ${shortDate(when.at)}`);
+    stamp.title = new Date(when.at).toLocaleString();
+    meta.append(stamp);
     if (task.priority !== "normal") {
       meta.append(el("span", `task-prio ${task.priority}`, t(`tasks.priority.${task.priority}`)));
     }
@@ -275,7 +358,7 @@ export class TaskPanel {
       const done = el("button", "task-banner-btn", t("tasks.markDone"));
       done.addEventListener("click", () => {
         this.looksDone.delete(task.id);
-        this.update(task, { status: "done" });
+        this.setStatus(task, "done");
         this.render();
       });
       const not = el("button", "task-banner-btn ghost", t("tasks.stillWorking"));
@@ -322,7 +405,7 @@ export class TaskPanel {
       status.append(o);
     }
     status.addEventListener("change", () => {
-      this.update(task, { status: status.value as Task["status"] });
+      this.setStatus(task, status.value as Task["status"]);
       this.render();
     });
     const priority = el("select");
@@ -515,7 +598,7 @@ export class TaskPanel {
       };
       if (existing) Object.assign(existing, values);
       else {
-        const created: TaskProject = { id: newId(), ...values };
+        const created: TaskProject = { id: newId(), nextSerial: 1, ...values };
         this.file.projects.push(created);
         this.file.selectedProject = created.id;
       }

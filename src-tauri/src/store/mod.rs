@@ -211,7 +211,15 @@ impl Store {
             "guardrails" => serde_json::to_value(self.load::<GuardrailsFile>()),
             "secrets-patterns" => serde_json::to_value(self.load::<SecretsPatternsFile>()),
             "keybindings" => serde_json::to_value(self.load::<KeybindingsFile>()),
-            "tasks" => serde_json::to_value(self.load::<TasksFile>()),
+            "tasks" => {
+                let mut file = self.load::<TasksFile>();
+                if file.backfill() {
+                    if let Err(e) = self.save(&file) {
+                        eprintln!("store: cannot update tasks.json: {e}");
+                    }
+                }
+                serde_json::to_value(file)
+            }
             _ => return Err(format!("unknown store file: {kind}")),
         };
         value.map_err(|e| e.to_string())

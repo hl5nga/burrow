@@ -350,3 +350,45 @@ fn older_pattern_files_absorb_new_presets_once() {
         1
     );
 }
+
+#[test]
+fn old_task_files_get_serials_and_completion_times() {
+    let root = TempRoot::new();
+    let store = Store::open(root.0.clone()).unwrap();
+    fs::write(
+        root.0.join("tasks.json"),
+        r#"{"version":1,"selectedProject":null,
+        "projects":[{"id":"p","name":"A","profileId":null,"tmuxSession":null,"template":""},
+                    {"id":"q","name":"B","profileId":null,"tmuxSession":null,"template":""}],
+        "tasks":[
+          {"id":"t3","projectId":"p","title":"third","status":"done","createdAt":300,"updatedAt":900},
+          {"id":"t1","projectId":"p","title":"first","status":"todo","createdAt":100,"updatedAt":100},
+          {"id":"t2","projectId":"p","title":"second","status":"todo","createdAt":200,"updatedAt":200},
+          {"id":"u1","projectId":"q","title":"other","status":"todo","createdAt":50,"updatedAt":50}
+        ]}"#,
+    )
+    .unwrap();
+    let value = store.get_json("tasks").unwrap();
+    let serial = |id: &str| {
+        value["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["id"] == id)
+            .unwrap()["serial"]
+            .clone()
+    };
+    // Numbered by creation order, separately per project.
+    assert_eq!(serial("t1"), 1);
+    assert_eq!(serial("t2"), 2);
+    assert_eq!(serial("t3"), 3);
+    assert_eq!(serial("u1"), 1);
+    let p = &value["projects"][0];
+    assert_eq!(p["nextSerial"], 4);
+    // Done without a completion time: the last change stands in for it.
+    let t3 = &value["tasks"][0];
+    assert_eq!(t3["completedAt"], 900);
+    // Already-numbered files are left alone, and numbers are not reused.
+    let again = store.get_json("tasks").unwrap();
+    assert_eq!(again, value);
+}
