@@ -26,11 +26,8 @@ import { Keybindings } from "./ui/keybindings";
 import { FileBrowser } from "./ui/file-browser";
 import { Launcher, resolveAutoOpen, type LauncherEntry } from "./ui/launcher";
 import { NetworkChip } from "./ui/network-chip";
-import { TextSizeChip } from "./ui/text-chip";
 import { loadTextSettings } from "./ui/text-settings";
-import { ThemeChip } from "./ui/theme-chip";
 import { loadTheme } from "./ui/theme-settings";
-import { LanguageChip } from "./ui/language-chip";
 import { loadLocale, t, onLocaleChange } from "./i18n";
 import { showAbout } from "./ui/about";
 import { confirmCloseWindow } from "./ui/confirm-close";
@@ -212,11 +209,8 @@ if (import.meta.env.DEV) Object.assign(window, { __burrow: devBag });
 
 const vpn = new VpnChip(app.querySelector<HTMLElement>(".res-mini")!);
 new NetworkChip(app.querySelector<HTMLElement>(".res-mini")!);
-new TextSizeChip(app.querySelector<HTMLElement>(".res-mini")!, (fontSize, lineHeight) =>
-  tabs.applyTextSettings(fontSize, lineHeight),
-);
-new ThemeChip(app.querySelector<HTMLElement>(".res-mini")!, (themeId) => tabs.applyTheme(themeId));
-new LanguageChip(app.querySelector<HTMLElement>(".res-mini")!);
+// Theme, language and text size live in Burrow → Settings… (settings-panel.ts);
+// the launcher keeps its own language chip for the very first screen.
 const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
 );

@@ -266,24 +266,12 @@
   color: var(--status-red);
 }
 
-.rm-chip.text-size {
-  font-family: var(--ui);
-  font-style: italic;
-  font-weight: 700;
-}
-
-.rm-chip.theme {
-  font-family: var(--ui);
-  font-size: 10px;
-}
-
 .rm-chip.language {
   font-family: var(--ui);
   font-size: 10px;
   letter-spacing: 0.02em;
 }
 
-.theme-card,
 .language-card {
   width: 170px;
 }
@@ -345,10 +333,6 @@
 
 .swatch-mono {
   background: #cfcfcf;
-}
-
-.text-card {
-  width: 210px;
 }
 
 .text-row {
