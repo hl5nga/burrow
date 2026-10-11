@@ -406,17 +406,24 @@
   display: none;
 }
 
-/* Claude Code usage chip: "5h 23%  주간 41%" — the percentage carries the colour. */
-.usage-chip .rm-chip.ok {
-  color: var(--status-green);
+/* Claude Code usage: one pill — AI icon (coloured by the worse limit), then
+   "5h 38%" and "7d 15%" with white numbers like the CPU/RAM chips. */
+.usage-chip {
+  gap: 7px;
 }
 
-.usage-chip .rm-chip.warn {
-  color: var(--status-orange);
+.usage-chip .uc-part {
+  white-space: nowrap;
 }
 
-.usage-chip .rm-chip.high {
-  color: var(--status-red);
+.usage-chip .uc-label {
+  color: var(--text-dim);
+}
+
+.usage-chip .uc-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
 }
 
 .usage-card {

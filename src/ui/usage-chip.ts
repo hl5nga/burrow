@@ -18,6 +18,9 @@ interface UsageSample {
 
 const POLL_MS = 30_000;
 
+/** A four-point sparkle: marks the AI (Claude Code) usage group. */
+const AI_ICON = `<svg class="rm-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1.5 9.6 5.9 14 7.5 9.6 9.1 8 13.5 6.4 9.1 2 7.5 6.4 5.9z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
+
 type UsageLevel = "ok" | "warn" | "high";
 const usageLevel = (percent: number): UsageLevel =>
   percent >= 90 ? "high" : percent >= 70 ? "warn" : "ok";
@@ -47,7 +50,7 @@ export class UsageMonitor {
     corner: HTMLElement,
     private readonly targets: () => ResourceTarget[],
   ) {
-    this.chip.className = "rm-group usage-chip";
+    this.chip.className = "rm-chip usage-chip";
     this.chip.hidden = true;
     this.card.className = "res-hud res-card usage-card";
     this.card.hidden = true;
@@ -130,11 +133,27 @@ export class UsageMonitor {
       return;
     }
     const s = hit.sample;
-    const cell = (label: string, w?: Window) =>
-      `<span class="rm-chip ${w ? usageLevel(w.percent) : ""}">${label} ${
+    const part = (label: string, w?: Window) =>
+      `<span class="uc-part"><span class="uc-label">${label}</span> ${
         w ? `${Math.round(w.percent)}%` : "–"
       }</span>`;
-    this.chip.innerHTML = cell("5h", s.fiveHour) + cell(t("usageChip.weekShort"), s.sevenDay);
+    // One pill for both limits, led by an AI icon whose colour is the worse of
+    // the two (like the CPU/RAM icons); the numbers stay white.
+    const worst = [s.fiveHour, s.sevenDay].reduce<UsageLevel | "">((acc, w) => {
+      if (!w) return acc;
+      const l = usageLevel(w.percent);
+      return acc === "high" || l === "high"
+        ? "high"
+        : acc === "warn" || l === "warn"
+          ? "warn"
+          : "ok";
+    }, "");
+    this.chip.className = `rm-chip usage-chip ${worst}`.trim();
+    this.chip.innerHTML =
+      AI_ICON +
+      part("5h", s.fiveHour) +
+      '<span class="uc-sep"></span>' +
+      part(t("usageChip.weekShort"), s.sevenDay);
     this.chip.title = t("usageChip.title");
     if (this.card.hidden) return;
 
