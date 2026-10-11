@@ -34,8 +34,6 @@ export default {
   confirmClose: {
     title: "Burrow를 닫으시겠습니까?",
     body1: "열려 있는 로컬 터미널 세션이 모두 종료됩니다.",
-    body2:
-      "SSH로 연결한 원격 tmux 세션은 서버에 그대로 남아 있어, 나중에 다시 접속하면 이어집니다.",
     cancel: "취소",
     close: "닫기",
   },

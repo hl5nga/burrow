@@ -10,7 +10,7 @@ import { t } from "../i18n";
 export function confirmCloseWindow(): Promise<boolean> {
   return chooseDialog(
     t("confirmClose.title"),
-    [t("confirmClose.body1"), t("confirmClose.body2")],
+    [t("confirmClose.body1")],
     [
       { value: "cancel", label: t("confirmClose.cancel"), kind: "ghost" },
       { value: "close", label: t("confirmClose.close"), kind: "danger" },

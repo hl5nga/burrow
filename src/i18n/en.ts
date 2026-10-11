@@ -42,8 +42,6 @@ const en: Loose<typeof ko> = {
   confirmClose: {
     title: "Close Burrow?",
     body1: "Every open local terminal session will end.",
-    body2:
-      "Remote tmux sessions over SSH stay on the server and pick up where they left off next time you connect.",
     cancel: "Cancel",
     close: "Close",
   },
