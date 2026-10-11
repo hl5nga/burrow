@@ -45,7 +45,7 @@
   --ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
 
   --titlebar-h: 38px;
-  --statusbar-h: 26px;
+  --statusbar-h: 32px;
   /* Room for the native macOS traffic lights drawn over the overlay titlebar. */
   --traffic-lights-w: 78px;
   /* Matches the macOS window corner so the edge highlight follows the real outline. */
@@ -322,9 +322,9 @@ body::after {
 
 .statusbar .seg.transport {
   margin-left: auto;
-  padding: 1px 7px;
+  padding: 2px 10px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--cyan);
   border: 1px solid rgba(75, 227, 208, 0.25);
   border-radius: 5px;
@@ -364,7 +364,7 @@ body::after {
   align-items: center;
   gap: 16px;
   padding: 0 14px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--text-mid);
   background: linear-gradient(
     to bottom,
@@ -387,7 +387,7 @@ body::after {
 
 .statusbar .divider {
   width: 1px;
-  height: 12px;
+  height: 16px;
   background: var(--border);
 }
 

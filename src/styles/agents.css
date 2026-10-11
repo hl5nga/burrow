@@ -187,14 +187,14 @@
 .statusbar .seg.agents-status {
   all: unset;
   display: flex;
-  gap: 10px;
+  gap: 16px;
   align-items: center;
   /* Its own auto margin (not just riding on .transport's) so it still lands
      at the right edge when .transport is hidden (no SSH connection). */
   margin-left: auto;
   padding: 0 2px;
   font-family: var(--ui);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-mid);
   cursor: default;
 }
@@ -205,13 +205,13 @@
 
 .agent-chip {
   display: inline-flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
   white-space: nowrap;
 }
 
 .agent-chip-dot {
-  font-size: 8px;
+  font-size: 14px;
   line-height: 1;
   color: var(--status-gray);
 }
