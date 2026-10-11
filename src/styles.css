@@ -180,7 +180,12 @@ body::after {
 }
 
 .titlebar {
+  /* Above the document viewer (z 40) so the chips' cards, which drop down over
+     the workspace, are never covered by it; below every dialog. */
+  position: relative;
+  z-index: 50;
   display: flex;
+  min-width: 0;
   align-items: flex-end;
   padding-left: var(--traffic-lights-w);
   background: linear-gradient(
@@ -209,18 +214,30 @@ body::after {
   gap: 2px;
   height: 100%;
   flex: 1;
+  min-width: 0;
   align-items: flex-end;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 30px;
-  padding: 0 16px;
+  padding: 0 12px;
   font-size: 12.5px;
   color: var(--text-dim);
   border-radius: 8px 8px 0 0;
+  /* Many tabs shrink (their names get an ellipsis) instead of pushing the
+     status chips off the end of the title bar. */
+  flex: 0 1 200px;
+  min-width: 56px;
+}
+
+.tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab .dot {
@@ -305,6 +322,7 @@ body::after {
 
 .tab-add {
   all: unset;
+  flex-shrink: 0;
   align-self: center;
   padding: 0 12px;
   font-size: 15px;

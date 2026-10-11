@@ -52,9 +52,10 @@ app.innerHTML = `
   <header class="titlebar" data-tauri-drag-region>
     <img class="brand-icon" src="${appIcon}" alt="" data-tauri-drag-region />
     <div class="tabs" data-tauri-drag-region></div>
+    <div class="res-mini"></div>
   </header>
   <div class="workspace">
-    <section class="term-body"><div class="res-mini"></div></section>
+    <section class="term-body"></section>
   </div>
   <footer class="statusbar">
     <div class="seg host"><span class="ico">◆</span> <span class="host-name">local</span></div>
