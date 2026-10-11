@@ -16,6 +16,7 @@ import { VpnChip } from "./ui/vpn-chip";
 import { ResourceMonitor } from "./ui/resource-chip";
 import { UsageMonitor } from "./ui/usage-chip";
 import { TaskPanel } from "./ui/task-panel";
+import { SettingsPanel } from "./ui/settings-panel";
 import { showToast } from "./ui/toast";
 import { copyText, selectedText } from "./ui/clipboard";
 import { AgentMonitor } from "./ui/agents";
@@ -221,6 +222,10 @@ const resources = new ResourceMonitor(app.querySelector<HTMLElement>(".res-mini"
 );
 const usage = new UsageMonitor(app.querySelector<HTMLElement>(".res-mini")!, () =>
   tabs.resourceTargets(),
+);
+const settings = new SettingsPanel(
+  (themeId) => tabs.applyTheme(themeId),
+  (fontSize, lineHeight) => tabs.applyTextSettings(fontSize, lineHeight),
 );
 const connect = (profile: StoredCommand) => void connectProfile(tabs, profile, vpn);
 const guardrails = new GuardrailManager(() => tabs.activeTarget());
@@ -445,6 +450,7 @@ void listen("menu-copy", () => {
     if (text) await copyText(text);
   })();
 });
+void listen("menu-settings", () => settings.open());
 void listen("menu-about", () => void showAbout());
 void listen("confirm-quit", () => void handleConfirmQuit());
 

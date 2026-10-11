@@ -293,6 +293,10 @@ export default {
     defaultTemplate: "다음 작업을 진행해줘: {title}",
     defaultTemplateDoc: "{doc} 문서를 읽고 진행해줘: {title}",
   },
+  settings: {
+    title: "설정",
+    close: "닫기",
+  },
   usageChip: {
     title: "Claude Code 사용량 — 5시간·주간 한도",
     cardTitle: "Claude Code 사용량",

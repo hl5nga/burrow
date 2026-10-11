@@ -447,3 +447,36 @@
 .usage-action {
   margin-top: 10px;
 }
+
+/* Settings dialog (Burrow → Settings…) */
+.settings-dialog {
+  width: min(520px, calc(100vw - 48px));
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.settings-section {
+  padding: 14px 0 12px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section h4 {
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.settings-dialog .dialog-actions {
+  justify-content: flex-end;
+  margin-top: 6px;
+}

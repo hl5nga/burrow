@@ -310,6 +310,10 @@ const en: Loose<typeof ko> = {
     defaultTemplate: "Please work on this task: {title}",
     defaultTemplateDoc: "Read {doc} and work on: {title}",
   },
+  settings: {
+    title: "Settings",
+    close: "Done",
+  },
   usageChip: {
     title: "Claude Code usage — 5-hour and weekly limits",
     cardTitle: "Claude Code usage",

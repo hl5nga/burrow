@@ -7,10 +7,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return node;
 }
 
-const LABEL: Record<Locale, string> = { ko: "한국어", en: "English" };
+export const LABEL: Record<Locale, string> = { ko: "한국어", en: "English" };
 // A flag, not the same globe glyph as the network chip right next to it —
 // the two chips were easy to mix up at a glance.
-const FLAG: Record<Locale, string> = { ko: "🇰🇷", en: "🇺🇸" };
+export const FLAG: Record<Locale, string> = { ko: "🇰🇷", en: "🇺🇸" };
 
 /**
  * "🇰🇷 KO"/"🇺🇸 EN" chip — the forced language override the user asked for,

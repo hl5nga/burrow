@@ -154,6 +154,8 @@ pub fn run() {
             let id = event.id().as_ref();
             if id == menu::ABOUT_ID {
                 let _ = app.emit("menu-about", ());
+            } else if id == menu::SETTINGS_ID {
+                let _ = app.emit("menu-settings", ());
             } else if id == menu::VIEW_STARTUP_ID {
                 let _ = app.emit("menu-view-startup", ());
             } else if id == menu::COPY_ID {

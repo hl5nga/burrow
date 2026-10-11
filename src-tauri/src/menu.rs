@@ -19,10 +19,12 @@ use tauri::{AppHandle, Runtime};
 
 pub const ABOUT_ID: &str = "about-burrow";
 pub const VIEW_STARTUP_ID: &str = "view-startup";
+pub const SETTINGS_ID: &str = "settings";
 pub const COPY_ID: &str = "menu-copy";
 
 struct Labels {
     about: &'static str,
+    settings: &'static str,
     view_startup: &'static str,
     hide: &'static str,
     hide_others: &'static str,
@@ -43,6 +45,7 @@ struct Labels {
 
 const KO: Labels = Labels {
     about: "Burrow 정보",
+    settings: "설정…",
     view_startup: "연결 목록 보기…",
     hide: "Burrow 가리기",
     hide_others: "다른 항목 가리기",
@@ -63,6 +66,7 @@ const KO: Labels = Labels {
 
 const EN: Labels = Labels {
     about: "About Burrow",
+    settings: "Settings…",
     view_startup: "View Startup…",
     hide: "Hide Burrow",
     hide_others: "Hide Others",
@@ -108,9 +112,11 @@ fn detect_locale() -> String {
 
 fn build_with_labels<R: Runtime>(app: &AppHandle<R>, l: &Labels) -> tauri::Result<Menu<R>> {
     let about = MenuItemBuilder::with_id(ABOUT_ID, l.about).build(app)?;
+    let settings = MenuItemBuilder::with_id(SETTINGS_ID, l.settings).build(app)?;
     let view_startup = MenuItemBuilder::with_id(VIEW_STARTUP_ID, l.view_startup).build(app)?;
     let app_menu = SubmenuBuilder::new(app, "Burrow")
         .item(&about)
+        .item(&settings)
         .separator()
         .item(&view_startup)
         .separator()
