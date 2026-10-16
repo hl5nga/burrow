@@ -17,6 +17,7 @@ import { ResourceMonitor } from "./ui/resource-chip";
 import { UsageMonitor } from "./ui/usage-chip";
 import { TaskPanel } from "./ui/task-panel";
 import { SettingsPanel } from "./ui/settings-panel";
+import { askSshPassword } from "./ui/password-dialog";
 import { showToast } from "./ui/toast";
 import { copyText, selectedText } from "./ui/clipboard";
 import { AgentMonitor } from "./ui/agents";
@@ -443,6 +444,36 @@ void listen("menu-copy", () => {
     const text = selectedText();
     if (text) await copyText(text);
   })();
+});
+// ssh asks for a login password: a saved one was already typed for it by the
+// Rust side; otherwise ask here, with the option to remember it in the Keychain.
+interface PasswordEvent {
+  id: number;
+  profileId: string;
+  usedSaved: boolean;
+}
+void listen<PasswordEvent>("ssh-password-prompt", async (e) => {
+  const { id, profileId } = e.payload;
+  const file = await invoke<{ commands: StoredCommand[] }>("store_get", { kind: "commands" }).catch(
+    () => ({ commands: [] as StoredCommand[] }),
+  );
+  const profile = file.commands.find((c) => c.id === profileId);
+  const answer = await askSshPassword(profile?.name || profile?.sshHost || "SSH");
+  if (!answer) return activeSession()?.focus();
+  try {
+    await invoke("ssh_password_provide", {
+      id,
+      profileId,
+      password: answer.password,
+      save: answer.save,
+    });
+  } catch (err) {
+    showToast(t("sshPassword.failed", { error: String(err) }));
+  }
+  activeSession()?.focus();
+});
+void listen<PasswordEvent>("ssh-password-rejected", (e) => {
+  showToast(t(e.payload.usedSaved ? "sshPassword.rejectedSaved" : "sshPassword.rejected"));
 });
 void listen("menu-settings", () => settings.open());
 void listen("menu-about", () => void showAbout());

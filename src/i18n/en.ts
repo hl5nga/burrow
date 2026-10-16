@@ -74,6 +74,15 @@ const en: Loose<typeof ko> = {
         placeholder: "e.g. user@home-laptop.tailnet.ts.net",
         hint: 'Can\'t connect while the remote laptop is asleep. Turn on System Settings › Battery › Options › "Wake for network access" there, or run caffeinate -s.',
       },
+      sshUser: {
+        label: "User",
+        placeholder: "Empty = this Mac's user name",
+        hint: "You can also write user@ in the host; this field wins.",
+      },
+      sshPort: {
+        label: "Port",
+        placeholder: "Empty = 22",
+      },
       tmuxSession: {
         label: "tmux session",
         placeholder: "Leave blank to connect without tmux",
@@ -123,12 +132,22 @@ const en: Loose<typeof ko> = {
     saved: "Saved '{{name}}'",
     deleted: "Deleted '{{name}}'",
     tmuxTag: "tmux · {{session}}",
+    password: {
+      label: "Password",
+      saved: "Saved in the Keychain — typed automatically when you connect",
+      none: "No saved password — a prompt appears when you connect, with an option to save it",
+      clear: "Delete saved password",
+      cleared: "Saved password deleted",
+      hint: "Key login (ssh-copy-id) needs no password and is safer.",
+    },
     validation: {
       commandRequired: "Enter the command to run",
       nameRequired: "Enter a name for the profile",
       hostRequired: "Enter a host to connect to",
       hostFormat: "Only user@host, a host alias, or host:port (no leading space or '-')",
       tmuxFormat: "Only letters, numbers, '-' and '_' (up to 64 characters)",
+      userFormat: "Letters, numbers and . _ - only, and not starting with -",
+      portFormat: "A number from 1 to 65535",
     },
   },
   frequentPanel: {
@@ -313,6 +332,18 @@ const en: Loose<typeof ko> = {
   settings: {
     title: "Settings",
     close: "Done",
+  },
+  sshPassword: {
+    title: "SSH password",
+    body: "{{label}} needs a password.",
+    field: "Password",
+    save: "Remember it (save in the macOS Keychain)",
+    ok: "Connect",
+    cancel: "Cancel (type it in the terminal)",
+    rejected: "That password was not accepted. Type it again in the terminal.",
+    rejectedSaved:
+      "The saved password was not accepted and was deleted. You will be asked again next time.",
+    failed: "Could not send the password: {{error}}",
   },
   usageChip: {
     title: "Claude Code usage — 5-hour and weekly limits",

@@ -10,6 +10,7 @@ mod network;
 mod pty;
 mod remote;
 mod resources;
+mod secret;
 mod stats;
 mod store;
 mod tmux;
@@ -48,6 +49,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         clip::clip_image_save,
         clip::clip_text_write,
         usage::usage_sample,
+        secret::ssh_password_saved,
+        secret::ssh_password_clear,
+        secret::ssh_password_provide,
         usage::usage_install,
         usage::usage_uninstall,
         events::remote_event_stream,
@@ -96,6 +100,9 @@ fn invoke_handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'stat
         clip::clip_image_save,
         clip::clip_text_write,
         usage::usage_sample,
+        secret::ssh_password_saved,
+        secret::ssh_password_clear,
+        secret::ssh_password_provide,
         usage::usage_install,
         usage::usage_uninstall,
         events::remote_event_stream,

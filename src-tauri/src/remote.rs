@@ -150,6 +150,38 @@ pub fn validate_tmux_session(name: &str) -> Result<(), String> {
     }
 }
 
+/// The ssh destination and `-p` port for a profile. `host` may itself be
+/// `[user@]host[:port]`; a separate user or port field wins over that.
+/// (ssh has no host:port syntax, so the port becomes -p.)
+fn resolve_target(
+    host: &str,
+    user: Option<&str>,
+    port: Option<u16>,
+) -> Result<(String, Option<String>), String> {
+    let (dest, host_port) = match host.rsplit_once(':') {
+        Some((dest, port)) => (dest, Some(port.to_string())),
+        None => (host, None),
+    };
+    let user = user.map(str::trim).filter(|u| !u.is_empty());
+    let dest = match user {
+        Some(user) => {
+            let ok_char = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-');
+            if user.starts_with('-') || !user.chars().all(ok_char) {
+                return Err(format!("사용할 수 없는 SSH 사용자: {user}"));
+            }
+            let bare = dest.rsplit_once('@').map_or(dest, |(_, h)| h);
+            format!("{user}@{bare}")
+        }
+        None => dest.to_string(),
+    };
+    let port = match port {
+        Some(0) => return Err("포트는 1~65535 사이여야 합니다".into()),
+        Some(p) => Some(p.to_string()),
+        None => host_port,
+    };
+    Ok((dest, port))
+}
+
 pub(crate) fn load_profile(store: &Store, profile_id: &str) -> Result<Profile, String> {
     let commands = store.load::<CommandsFile>();
     let profile = commands
@@ -159,11 +191,7 @@ pub(crate) fn load_profile(store: &Store, profile_id: &str) -> Result<Profile, S
         .ok_or("SSH 프로필을 찾을 수 없습니다")?;
     let host = profile.ssh_host.clone().unwrap_or_default();
     validate_host(&host)?;
-    // ssh has no host:port syntax; the port becomes -p.
-    let (dest, port) = match host.rsplit_once(':') {
-        Some((dest, port)) => (dest.to_string(), Some(port.to_string())),
-        None => (host, None),
-    };
+    let (dest, port) = resolve_target(&host, profile.ssh_user.as_deref(), profile.ssh_port)?;
     let tmux_session = profile
         .tmux_session
         .as_deref()
@@ -611,7 +639,9 @@ pub enum SessionTransport {
 
 // Tauri injects the app handle and state as arguments.
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
+// `async`: reading a saved password from the Keychain can wait on a system
+// prompt; that must not freeze the UI thread.
+#[tauri::command(async)]
 pub fn pty_spawn_ssh(
     app: AppHandle,
     state: tauri::State<'_, PtyState>,
@@ -639,7 +669,10 @@ pub fn pty_spawn_ssh(
         mosh_server.as_deref(),
         event_log.as_deref(),
     )?;
-    pty::spawn(app, &state, command, cols, rows, on_output)
+    // The login password prompt is answered from the Keychain if one is saved,
+    // or the webview is asked for it (see pty.rs).
+    let watch = pty::PasswordWatch::new(profile_id.clone(), crate::secret::get(&profile_id));
+    pty::spawn(app, &state, command, cols, rows, on_output, Some(watch))
 }
 
 /// Emits `network-changed` when this Mac's outbound address changes (Wi-Fi to
@@ -796,6 +829,33 @@ mod tests {
         assert!(plain.contains("tmux new -A -s burrow;") && !plain.contains("exec tmux"));
         assert!(plain.contains("exec \"${SHELL:-sh}\" -l") && !plain.contains("ZDOTDIR"));
         assert!(hooked.contains("exec zsh -l") && !hooked.contains("exec tmux"));
+    }
+
+    #[test]
+    fn separate_user_and_port_fields_win_over_the_host_string() {
+        let t = |h, u, p| resolve_target(h, u, p);
+        assert_eq!(
+            t("home.example.com", None, None).unwrap(),
+            ("home.example.com".into(), None)
+        );
+        assert_eq!(
+            t("me@home:2222", None, None).unwrap(),
+            ("me@home".into(), Some("2222".into()))
+        );
+        assert_eq!(
+            t("home", Some("felix"), Some(22222)).unwrap(),
+            ("felix@home".into(), Some("22222".into()))
+        );
+        // The fields override what the host string says.
+        assert_eq!(
+            t("old@home:22", Some("new"), Some(2200)).unwrap(),
+            ("new@home".into(), Some("2200".into()))
+        );
+        assert_eq!(t("home", Some("  "), None).unwrap(), ("home".into(), None));
+        // Nothing that ssh could read as an option or a second host.
+        assert!(t("home", Some("-oProxyCommand=x"), None).is_err());
+        assert!(t("home", Some("a@b"), None).is_err());
+        assert!(t("home", None, Some(0)).is_err());
     }
 
     #[test]

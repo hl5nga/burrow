@@ -14,6 +14,10 @@ export interface StoredCommand {
   description: string;
   type: CommandType;
   sshHost: string | null;
+  /** Login name, when not part of `sshHost` (`user@host`). */
+  sshUser: string | null;
+  /** Port, when not part of `sshHost` (`host:port`). */
+  sshPort: number | null;
   tmuxSession: string | null;
   transport: Transport;
   vpnPreConnect: string | null;
@@ -29,7 +33,13 @@ export interface StoredCommand {
  * the caller (command-manager.ts) does the t() lookup for display.
  */
 export type ValidationKey =
-  "commandRequired" | "nameRequired" | "hostRequired" | "hostFormat" | "tmuxFormat";
+  | "commandRequired"
+  | "nameRequired"
+  | "hostRequired"
+  | "hostFormat"
+  | "userFormat"
+  | "portFormat"
+  | "tmuxFormat";
 
 export type FieldErrors = Partial<Record<keyof StoredCommand, ValidationKey>>;
 
@@ -38,7 +48,17 @@ export type FieldErrors = Partial<Record<keyof StoredCommand, ValidationKey>>;
 // -oProxyCommand=…, which runs arbitrary commands), so it is never allowed.
 const SSH_HOST = /^(?:[A-Za-z0-9._][A-Za-z0-9._-]*@)?[A-Za-z0-9_][A-Za-z0-9._-]*(?::\d{1,5})?$/;
 // tmux rejects "." and ":" in session names; keep it to a safe, predictable set.
+// A login name: never starts with "-" (it would be read as an ssh option).
+const SSH_USER = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const TMUX_SESSION = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The form keeps the port as typed text; empty = none. */
+function parsePort(value: unknown): number | null | "invalid" {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const n = Number(text);
+  return /^\d{1,5}$/.test(text) && n >= 1 && n <= 65535 ? n : "invalid";
+}
 
 export function validateCommand(c: StoredCommand): FieldErrors {
   const errors: FieldErrors = {};
@@ -49,6 +69,9 @@ export function validateCommand(c: StoredCommand): FieldErrors {
     const host = c.sshHost?.trim() ?? "";
     if (!host) errors.sshHost = "hostRequired";
     else if (!SSH_HOST.test(host)) errors.sshHost = "hostFormat";
+    const user = c.sshUser?.trim() ?? "";
+    if (user && !SSH_USER.test(user)) errors.sshUser = "userFormat";
+    if (parsePort(c.sshPort) === "invalid") errors.sshPort = "portFormat";
     const session = c.tmuxSession?.trim() ?? "";
     if (session && !TMUX_SESSION.test(session)) errors.tmuxSession = "tmuxFormat";
   }
@@ -68,6 +91,12 @@ export function normalizeCommand(c: StoredCommand): StoredCommand {
     command: ssh ? "" : c.command.trim(),
     description: c.description.trim(),
     sshHost: ssh ? text(c.sshHost) : null,
+    sshUser: ssh ? text(c.sshUser) : null,
+    sshPort: ssh
+      ? typeof parsePort(c.sshPort) === "number"
+        ? (parsePort(c.sshPort) as number)
+        : null
+      : null,
     tmuxSession: ssh ? text(c.tmuxSession) : null,
     transport: ssh ? c.transport : "auto",
     vpnPreConnect: ssh ? text(c.vpnPreConnect) : null,
@@ -98,6 +127,8 @@ export function emptyCommand(type: CommandType = "shell"): StoredCommand {
     description: "",
     type,
     sshHost: null,
+    sshUser: null,
+    sshPort: null,
     tmuxSession: null,
     transport: "auto",
     vpnPreConnect: null,

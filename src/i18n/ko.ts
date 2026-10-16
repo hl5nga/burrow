@@ -66,6 +66,15 @@ export default {
         placeholder: "예: user@home-laptop.tailnet.ts.net",
         hint: "원격 노트북이 잠들면 접속할 수 없습니다. 그쪽에서 시스템 설정 › 배터리 › 옵션의 '네트워크 접근 시 깨우기'를 켜거나 caffeinate -s를 실행해 두세요",
       },
+      sshUser: {
+        label: "아이디 (User)",
+        placeholder: "비워 두면 이 Mac의 사용자 이름",
+        hint: "호스트에 user@ 로 적어도 되지만, 여기에 적은 값이 우선합니다.",
+      },
+      sshPort: {
+        label: "포트 (Port)",
+        placeholder: "비워 두면 22",
+      },
       tmuxSession: {
         label: "tmux 세션",
         placeholder: "비워 두면 tmux 없이 접속",
@@ -114,12 +123,22 @@ export default {
     saved: "'{{name}}' 저장됨",
     deleted: "'{{name}}' 삭제됨",
     tmuxTag: "tmux · {{session}}",
+    password: {
+      label: "비밀번호",
+      saved: "키체인에 저장되어 있습니다 — 접속할 때 자동으로 입력됩니다",
+      none: "저장된 비밀번호 없음 — 접속할 때 입력창이 뜨고, 저장할지 고를 수 있습니다",
+      clear: "저장된 비밀번호 지우기",
+      cleared: "저장된 비밀번호를 지웠습니다",
+      hint: "키 로그인(ssh-copy-id)을 쓰면 비밀번호가 필요 없고 더 안전합니다.",
+    },
     validation: {
       commandRequired: "실행할 명령을 입력하세요",
       nameRequired: "프로필 이름을 입력하세요",
       hostRequired: "접속할 호스트를 입력하세요",
       hostFormat: "user@host, 호스트 별칭, host:port 형식만 가능합니다 (공백·'-'로 시작 불가)",
       tmuxFormat: "영문·숫자·'-'·'_'만 쓸 수 있습니다 (최대 64자)",
+      userFormat: "영문·숫자·. _ - 만 쓸 수 있고 -로 시작할 수 없습니다",
+      portFormat: "1~65535 사이의 숫자여야 합니다",
     },
   },
   frequentPanel: {
@@ -296,6 +315,17 @@ export default {
   settings: {
     title: "설정",
     close: "닫기",
+  },
+  sshPassword: {
+    title: "SSH 비밀번호",
+    body: "{{label}}에 접속하려면 비밀번호가 필요합니다.",
+    field: "비밀번호",
+    save: "다음에도 사용 (macOS 키체인에 저장)",
+    ok: "접속",
+    cancel: "취소 (터미널에서 직접 입력)",
+    rejected: "비밀번호가 맞지 않습니다. 터미널에서 다시 입력하세요.",
+    rejectedSaved: "저장된 비밀번호가 맞지 않아 지웠습니다. 다음 접속 때 다시 입력하세요.",
+    failed: "비밀번호를 보내지 못했습니다: {{error}}",
   },
   usageChip: {
     title: "Claude Code 사용량 — 5시간·주간 한도",

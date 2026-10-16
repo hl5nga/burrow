@@ -72,6 +72,21 @@ function buildFields(): FieldSpec[] {
       mono: true,
     },
     {
+      key: "sshUser",
+      label: t("commandManager.fields.sshUser.label"),
+      for: "ssh-profile",
+      placeholder: t("commandManager.fields.sshUser.placeholder"),
+      hint: t("commandManager.fields.sshUser.hint"),
+      mono: true,
+    },
+    {
+      key: "sshPort",
+      label: t("commandManager.fields.sshPort.label"),
+      for: "ssh-profile",
+      placeholder: t("commandManager.fields.sshPort.placeholder"),
+      mono: true,
+    },
+    {
       key: "tmuxSession",
       label: t("commandManager.fields.tmuxSession.label"),
       for: "ssh-profile",
@@ -351,6 +366,7 @@ export class CommandManager {
       this.form.append(field);
 
       if (spec.key === "sshHost") this.form.append(this.transportField());
+      if (spec.key === "sshPort") this.form.append(this.passwordField());
       if (spec.key === "vpnPreConnect") this.form.append(this.homeNetworksField());
       if (spec.key === "vpnPostDisconnect") {
         const suggest = el("button", "btn ghost vpn-suggest", t("commandManager.vpnAutofill"));
@@ -390,6 +406,31 @@ export class CommandManager {
       actions.append(del);
     }
     this.form.append(actions);
+  }
+
+  /** Whether a login password is saved in the Keychain for this profile, and a way to delete it. */
+  private passwordField(): HTMLElement {
+    const field = el("div", "field");
+    field.append(el("label", undefined, t("commandManager.password.label")));
+    const status = el("div", "field-hint", t("commandManager.password.none"));
+    field.append(status);
+    const profileId = this.draft.id;
+    if (profileId) {
+      void invoke<boolean>("ssh_password_saved", { profileId }).then((saved) => {
+        if (!saved) return;
+        status.textContent = t("commandManager.password.saved");
+        const clear = el("button", "btn ghost", t("commandManager.password.clear"));
+        clear.type = "button";
+        clear.addEventListener("click", async () => {
+          await invoke("ssh_password_clear", { profileId }).catch(() => {});
+          showToast(t("commandManager.password.cleared"));
+          this.renderForm();
+        });
+        field.append(clear);
+      });
+    }
+    field.append(el("div", "field-hint", t("commandManager.password.hint")));
+    return field;
   }
 
   /** Networks where the VPN step is skipped; others always run it first. */

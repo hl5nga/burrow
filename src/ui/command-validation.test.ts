@@ -86,3 +86,31 @@ test("unrecognized VPN commands get no suggestion, never a guess", () => {
   assert.equal(suggestVpnDisconnect("./my-vpn-script.sh"), null);
   assert.equal(suggestVpnDisconnect(""), null);
 });
+
+test("separate user and port fields are checked and normalized", () => {
+  const p = (user: string | null, port: unknown) => ({
+    ...ssh("home"),
+    sshUser: user,
+    sshPort: port as number | null,
+  });
+  assert.deepEqual(validateCommand(p("felix", 22222)), {});
+  assert.deepEqual(validateCommand(p(null, null)), {});
+  // The form keeps the port as typed text.
+  assert.deepEqual(validateCommand(p("felix", "22222")), {});
+  for (const bad of ["abc", "0", "70000", "-1", "22.5"]) {
+    assert.equal(validateCommand(p(null, bad)).sshPort, "portFormat", bad);
+  }
+  for (const bad of ["-oProxyCommand=x", "a b", "a@b", "bad;rm"]) {
+    assert.equal(validateCommand(p(bad, null)).sshUser, "userFormat", bad);
+  }
+  const n = normalizeCommand(p("  felix  ", " 22222 "));
+  assert.equal(n.sshUser, "felix");
+  assert.equal(n.sshPort, 22222);
+  assert.equal(normalizeCommand(p("", "")).sshUser, null);
+  assert.equal(normalizeCommand(p(null, "")).sshPort, null);
+  // Shell commands carry neither.
+  assert.equal(
+    normalizeCommand({ ...emptyCommand(), command: "ls", sshUser: "x", sshPort: 22 }).sshUser,
+    null,
+  );
+});

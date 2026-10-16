@@ -62,6 +62,14 @@ impl PtyState {
         session.writer.write_all(data).map_err(|e| e.to_string())
     }
 
+    /// Like `write`, but for a secret (a password): it is never part of the
+    /// opt-in input trace.
+    pub fn write_secret(&self, id: u32, data: &[u8]) -> Result<(), String> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let session = sessions.get_mut(&id).ok_or("unknown session")?;
+        session.writer.write_all(data).map_err(|e| e.to_string())
+    }
+
     #[cfg(debug_assertions)]
     pub fn ids(&self) -> Vec<u32> {
         let mut ids: Vec<u32> = self.sessions.lock().unwrap().keys().copied().collect();
@@ -171,7 +179,7 @@ pub fn pty_spawn(
     rows: u16,
     on_output: Channel<InvokeResponseBody>,
 ) -> Result<u32, String> {
-    spawn(app, &state, build_command(), cols, rows, on_output)
+    spawn(app, &state, build_command(), cols, rows, on_output, None)
 }
 
 /// Environment every session gets, local shell or ssh client alike.
@@ -186,6 +194,92 @@ pub fn base_env(cmd: &mut CommandBuilder) {
     }
 }
 
+/// How long after starting an ssh session its login password prompt is still
+/// answered or asked for; later "password:" lines belong to the remote shell
+/// (sudo and the like) and are never touched.
+const PASSWORD_WINDOW: Duration = Duration::from_secs(90);
+
+/// What the watch wants done with a login password prompt.
+enum PromptAction {
+    /// A saved password: type it, once.
+    Answer(String),
+    /// None saved: ask the user (the webview shows a dialog).
+    Ask,
+    /// The prompt came back after an answer: the password was wrong.
+    Rejected { used_saved: bool },
+}
+
+/// Watches the start of an ssh/mosh session for its login password prompt.
+pub struct PasswordWatch {
+    profile_id: String,
+    saved: Option<String>,
+    used_saved: bool,
+    prompts: u32,
+    started: Instant,
+    tail: String,
+}
+
+impl PasswordWatch {
+    pub fn new(profile_id: String, saved: Option<String>) -> Self {
+        Self {
+            profile_id,
+            saved,
+            used_saved: false,
+            prompts: 0,
+            started: Instant::now(),
+            tail: String::new(),
+        }
+    }
+
+    fn feed(&mut self, bytes: &[u8]) -> Option<PromptAction> {
+        if self.started.elapsed() > PASSWORD_WINDOW {
+            return None;
+        }
+        self.tail.push_str(&String::from_utf8_lossy(bytes));
+        if self.tail.len() > 400 {
+            let cut = self.tail.len() - 300;
+            let cut = (cut..self.tail.len())
+                .find(|&i| self.tail.is_char_boundary(i))
+                .unwrap_or(self.tail.len());
+            self.tail.drain(..cut);
+        }
+        if !looks_like_password_prompt(&self.tail) {
+            return None;
+        }
+        self.tail.clear();
+        self.prompts += 1;
+        match self.prompts {
+            1 => match self.saved.take() {
+                Some(password) => {
+                    self.used_saved = true;
+                    Some(PromptAction::Answer(password))
+                }
+                None => Some(PromptAction::Ask),
+            },
+            2 => Some(PromptAction::Rejected {
+                used_saved: self.used_saved,
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// ssh's login prompt: `user@host's password: ` (or `Password:` from
+/// keyboard-interactive). Not a key's "Enter passphrase for …", and not
+/// sudo's "[sudo] password for user:".
+pub(crate) fn looks_like_password_prompt(tail: &str) -> bool {
+    let last = tail.rsplit(['\n', '\r']).next().unwrap_or(tail).trim_end();
+    last.len() < 160 && last.to_ascii_lowercase().ends_with("password:")
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PasswordEvent {
+    id: u32,
+    profile_id: String,
+    used_saved: bool,
+}
+
 pub fn spawn(
     app: AppHandle,
     state: &PtyState,
@@ -193,6 +287,7 @@ pub fn spawn(
     cols: u16,
     rows: u16,
     on_output: Channel<InvokeResponseBody>,
+    watch: Option<PasswordWatch>,
 ) -> Result<u32, String> {
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -225,12 +320,19 @@ pub fn spawn(
     );
 
     let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    let reader_app = app.clone();
+    let mut watch = watch;
     thread::spawn(move || {
         let mut buf = vec![0u8; READ_BUF];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
+                    if let Some(w) = watch.as_mut() {
+                        if let Some(action) = w.feed(&buf[..n]) {
+                            handle_prompt(&reader_app, id, w, action);
+                        }
+                    }
                     if tx.send(buf[..n].to_vec()).is_err() {
                         break;
                     }
@@ -247,6 +349,32 @@ pub fn spawn(
     });
 
     Ok(id)
+}
+
+fn handle_prompt(app: &AppHandle, id: u32, watch: &PasswordWatch, action: PromptAction) {
+    let event = |used_saved| PasswordEvent {
+        id,
+        profile_id: watch.profile_id.clone(),
+        used_saved,
+    };
+    match action {
+        PromptAction::Answer(password) => {
+            let _ = app
+                .state::<PtyState>()
+                .write_secret(id, format!("{password}\r").as_bytes());
+        }
+        PromptAction::Ask => {
+            let _ = app.emit("ssh-password-prompt", event(false));
+        }
+        PromptAction::Rejected { used_saved } => {
+            // A saved password that no longer works is dropped, so a reconnect
+            // loop can't keep retrying it against the account.
+            if used_saved {
+                crate::secret::delete(&watch.profile_id);
+            }
+            let _ = app.emit("ssh-password-rejected", event(used_saved));
+        }
+    }
 }
 
 #[tauri::command]
@@ -281,4 +409,60 @@ pub fn pty_kill(state: tauri::State<'_, PtyState>, id: u32) -> Result<(), String
         session.killer.kill().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod prompt_tests {
+    use super::*;
+
+    #[test]
+    fn recognises_ssh_login_prompts_only() {
+        assert!(looks_like_password_prompt("felix@home's password: "));
+        assert!(looks_like_password_prompt("Last login...\r\nPassword: "));
+        assert!(looks_like_password_prompt("(felix@home) Password:"));
+        // Not login passwords.
+        assert!(!looks_like_password_prompt(
+            "Enter passphrase for key '/Users/x/.ssh/id': "
+        ));
+        assert!(!looks_like_password_prompt("[sudo] password for felix: "));
+        assert!(!looks_like_password_prompt("Verification code: "));
+        assert!(!looks_like_password_prompt(
+            "the password: is in the doc\r\n$ "
+        ));
+    }
+
+    #[test]
+    fn answers_once_asks_when_nothing_saved_and_reports_a_second_prompt() {
+        let mut saved = PasswordWatch::new("p".into(), Some("hunter2".into()));
+        assert!(saved.feed(b"banner\r\nfelix@h's pass").is_none());
+        match saved.feed(b"word: ") {
+            Some(PromptAction::Answer(p)) => assert_eq!(p, "hunter2"),
+            _ => panic!("expected the saved password to be sent"),
+        }
+        // Wrong password: ssh asks again → rejected, and it says it was the saved one.
+        match saved.feed(b"\r\nPermission denied, please try again.\r\nfelix@h's password: ") {
+            Some(PromptAction::Rejected { used_saved }) => assert!(used_saved),
+            _ => panic!("expected a rejection"),
+        }
+        // A third prompt is left to the user at the terminal.
+        assert!(saved.feed(b"\r\nfelix@h's password: ").is_none());
+
+        let mut none = PasswordWatch::new("p".into(), None);
+        assert!(matches!(
+            none.feed(b"felix@h's password: "),
+            Some(PromptAction::Ask)
+        ));
+        assert!(matches!(
+            none.feed(b"\r\nfelix@h's password: "),
+            Some(PromptAction::Rejected { used_saved: false })
+        ));
+    }
+
+    #[test]
+    fn ordinary_output_is_ignored_and_the_window_closes() {
+        let mut w = PasswordWatch::new("p".into(), Some("x".into()));
+        assert!(w.feed("한글 출력 only\r\n$ ls".as_bytes()).is_none());
+        w.started = Instant::now() - PASSWORD_WINDOW - Duration::from_secs(1);
+        assert!(w.feed(b"felix@h's password: ").is_none());
+    }
 }

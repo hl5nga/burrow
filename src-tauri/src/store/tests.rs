@@ -30,6 +30,8 @@ fn sample_command(i: usize) -> Command {
         description: "프로덕션 배포".repeat(20),
         kind: CommandType::SshProfile,
         ssh_host: Some("home-laptop.tailnet.ts.net".into()),
+        ssh_user: Some("felix".into()),
+        ssh_port: Some(22222),
         tmux_session: Some("burrow".into()),
         transport: Transport::Mosh,
         vpn_pre_connect: Some("tailscale up".into()),

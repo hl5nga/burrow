@@ -44,6 +44,10 @@ pub struct Command {
     #[serde(rename = "type")]
     pub kind: CommandType,
     pub ssh_host: Option<String>,
+    /// Login name, when not written into `ssh_host` as `user@host`.
+    pub ssh_user: Option<String>,
+    /// Port, when not written into `ssh_host` as `host:port`.
+    pub ssh_port: Option<u16>,
     pub tmux_session: Option<String>,
     pub transport: Transport,
     pub vpn_pre_connect: Option<String>,
