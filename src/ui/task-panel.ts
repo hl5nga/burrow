@@ -65,6 +65,8 @@ const STATUS_MARK: Record<string, string> = {
  */
 export class TaskPanel {
   readonly element = el("div", "task-view");
+  /** No project matches the active tab, so the panel shows none. */
+  private blank = false;
   private file: TasksFile = { version: 1, projects: [], tasks: [], selectedProject: null };
   private loaded = false;
   private filter: TaskFilter = "open";
@@ -108,22 +110,25 @@ export class TaskPanel {
     else this.render();
   }
 
-  /** Switches to the project of the active SSH tab, when there is one. */
+  /**
+   * Shows the project that belongs to the active tab's connection, or nothing
+   * when no project matches (local tab, or an SSH profile without a project).
+   * Picking a project by hand holds until the next tab or connection change.
+   */
   followProfile(profileId: string | undefined) {
-    if (!profileId) return;
-    const current = this.project();
-    if (current?.profileId === profileId) return;
-    const match = this.file.projects.find((p) => p.profileId === profileId);
-    if (match) {
-      this.file.selectedProject = match.id;
-      this.expanded = null;
-      if (!this.element.hidden) this.render();
-    }
+    const match = profileId ? this.file.projects.find((p) => p.profileId === profileId) : undefined;
+    const same = match ? !this.blank && this.project()?.id === match.id : this.blank;
+    if (same) return;
+    this.blank = !match;
+    if (match) this.file.selectedProject = match.id;
+    this.expanded = null;
+    if (!this.element.hidden) this.render();
   }
 
   // ---------- data ----------
 
   private project(): TaskProject | undefined {
+    if (this.blank) return undefined;
     return (
       this.file.projects.find((p) => p.id === this.file.selectedProject) ?? this.file.projects[0]
     );
@@ -164,7 +169,9 @@ export class TaskPanel {
     const project = this.project();
     this.element.replaceChildren(this.renderHeader(project));
     if (!project) {
-      this.element.append(el("div", "task-empty", t("tasks.noProject")));
+      this.element.append(
+        el("div", "task-empty", t(this.file.projects.length ? "tasks.noMatch" : "tasks.noProject")),
+      );
       return;
     }
     this.element.append(this.renderAdd(project), this.renderFilter(), this.renderList(project));
@@ -178,6 +185,12 @@ export class TaskPanel {
     const row = el("div", "task-head");
     const select = el("select", "task-project-select");
     select.title = t("tasks.project");
+    if (!project) {
+      const none = el("option", undefined, "—");
+      none.value = "";
+      none.selected = true;
+      select.append(none);
+    }
     for (const p of this.file.projects) {
       const option = el("option", undefined, p.name);
       option.value = p.id;
@@ -186,6 +199,7 @@ export class TaskPanel {
     }
     select.disabled = this.file.projects.length === 0;
     select.addEventListener("change", () => {
+      this.blank = false;
       this.file.selectedProject = select.value;
       this.expanded = null;
       this.scheduleSave();
@@ -562,6 +576,7 @@ export class TaskPanel {
         if (choice !== "delete") return;
         this.file.projects = this.file.projects.filter((p) => p.id !== existing.id);
         this.file.tasks = this.file.tasks.filter((x) => x.projectId !== existing.id);
+        this.blank = false;
         this.file.selectedProject = this.file.projects[0]?.id ?? null;
         overlay.remove();
         await this.saveNow();
@@ -599,6 +614,7 @@ export class TaskPanel {
       else {
         const created: TaskProject = { id: newId(), nextSerial: 1, ...values };
         this.file.projects.push(created);
+        this.blank = false;
         this.file.selectedProject = created.id;
       }
       close();

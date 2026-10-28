@@ -238,6 +238,7 @@ export default {
     tabTasks: "할 일",
     project: "프로젝트",
     noProject: "프로젝트가 없습니다",
+    noMatch: "이 연결과 매칭된 프로젝트가 없습니다",
     newProject: "+ 새 프로젝트",
     projectName: "프로젝트 이름",
     projectHost: "연결 (SSH 프로필)",

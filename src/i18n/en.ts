@@ -247,6 +247,7 @@ const en: Loose<typeof ko> = {
     tabTasks: "Tasks",
     project: "Project",
     noProject: "No projects yet",
+    noMatch: "No project matches this connection",
     newProject: "+ New project",
     projectName: "Project name",
     projectHost: "Connection (SSH profile)",
