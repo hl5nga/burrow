@@ -1,6 +1,7 @@
 //! Read-only file browsing for the folder panel and document viewer: list a
 //! directory and read a file, on this Mac or on a profile's host over the SSH
-//! side channel. There is deliberately no write, rename or delete here.
+//! side channel. The only write is `fs_write`, which saves an edited document or
+//! config file that already exists; there is no create, rename or delete here.
 
 use std::io::Read;
 use std::path::Path;
@@ -195,6 +196,76 @@ pub fn fs_read(
     }
 }
 
+/// Documents and config files the viewer may save. Keep in step with
+/// `isEditable` in src/ui/file-browser.ts.
+const EDITABLE: [&str; 10] = [
+    "md", "markdown", "txt", "json", "yml", "yaml", "toml", "ini", "conf", "env",
+];
+
+fn is_editable(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path).to_lowercase();
+    // `.env`, `.env.local`, `.env.example` …
+    if name == ".env" || name.starts_with(".env.") {
+        return true;
+    }
+    name.rsplit_once('.')
+        .is_some_and(|(stem, ext)| !stem.is_empty() && EDITABLE.contains(&ext))
+}
+
+fn write_local(path: &Path, text: &str) -> Result<(), String> {
+    let meta = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    if !meta.is_file() {
+        return Err("파일이 아닙니다".into());
+    }
+    // In place, so permissions, ownership and symlinks stay as they are.
+    std::fs::write(path, text).map_err(|e| e.to_string())
+}
+
+/// Remote: land the text in a temp file first so a dropped connection can't
+/// leave a half-written document, then copy over the original in place.
+fn write_script(path: &str) -> String {
+    format!(
+        "f={p}; [ -f \"$f\" ] || {{ echo 'burrow:not-a-file'; exit 0; }}; \
+         t=\"$f.burrow-tmp.$$\"; cat > \"$t\" && cat -- \"$t\" > \"$f\"; r=$?; rm -f \"$t\"; \
+         [ $r -eq 0 ] && echo 'burrow:saved'",
+        p = quote(path)
+    )
+}
+
+/// Saves an edited document or config file. Existing files of the types in
+/// `EDITABLE` only.
+#[tauri::command(async)]
+pub fn fs_write(
+    store: tauri::State<'_, Arc<Store>>,
+    profile_id: Option<String>,
+    path: String,
+    text: String,
+) -> Result<(), String> {
+    check_path(&path)?;
+    if !is_editable(&path) {
+        return Err("이 종류의 파일은 저장할 수 없습니다".into());
+    }
+    match profile_id {
+        None => write_local(Path::new(&path), &text),
+        Some(id) => {
+            let profile = remote::load_profile(&store, &id)?;
+            let out = remote::side_command(
+                &store,
+                &profile,
+                &write_script(&path),
+                Some(text.as_bytes()),
+            )?;
+            if out.contains("burrow:not-a-file") {
+                return Err("파일이 아닙니다".into());
+            }
+            if !out.contains("burrow:saved") {
+                return Err("원격 저장에 실패했습니다".into());
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Pictures an HTML preview may inline. Bigger ones are left out.
 const MAX_ASSET: u64 = 1024 * 1024;
 
@@ -318,6 +389,32 @@ mod tests {
         assert_eq!(image_mime("/a/icon.svg"), Some("image/svg+xml"));
         assert_eq!(image_mime("/a/notes.txt"), None);
         assert_eq!(image_mime("/a/noext"), None);
+    }
+
+    #[test]
+    fn saving_rewrites_only_existing_editable_files() {
+        let dir = std::env::temp_dir().join(format!("burrow-write-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a.md");
+        std::fs::write(&file, "old").unwrap();
+        write_local(&file, "새 내용\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "새 내용\n");
+        assert!(write_local(&dir.join("missing.md"), "x").is_err());
+        assert!(write_local(&dir, "x").is_err());
+        for ok in [
+            "/x/README.MD",
+            "/x/.env",
+            "/x/.env.local",
+            "/x/a.json",
+            "/x/c.yml",
+            "/x/a.txt",
+        ] {
+            assert!(is_editable(ok), "{ok}");
+        }
+        for no in ["/x/a.rs", "/x/run.sh", "/x/env", "/x/.json", "/x/a.png"] {
+            assert!(!is_editable(no), "{no}");
+        }
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

@@ -159,7 +159,9 @@ const en: Loose<typeof ko> = {
     scopeHostLocal: "Local",
     scopeHostRemote: "This server",
     footerHint: "← → switch tabs · 1–9 to run",
-    railTitle: "Expand frequent commands (⌘J)",
+    railTitle: "Show the side panel (⌘J)",
+    pin: "Pin the panel (keep it docked)",
+    unpin: "Unpin — fold the panel to the right edge",
     emptyWhereDir: "in {{folder}}",
     emptyWhereOther: "here",
     empty:
@@ -442,7 +444,8 @@ const en: Loose<typeof ko> = {
   fileBrowser: {
     title: "Files",
     hiddenFiles: " Hidden files",
-    readOnlyNote: "Read only — edit files in your editor",
+    readOnlyNote:
+      "Read only — Markdown, JSON, YAML, .env and text files can be edited in the viewer",
     unknownCwd:
       "The current folder isn't known yet — run a command in a shell with hooks and it'll show up",
     locatingRemote: "Locating the remote folder…",
@@ -456,6 +459,16 @@ const en: Loose<typeof ko> = {
     binaryFile: "Binary file — not previewed ({{size}})",
     copy: "Copy",
     copied: "Copied the contents",
+    edit: "Edit",
+    save: "Save",
+    cancel: "Cancel",
+    saving: "Saving…",
+    saved: "Saved",
+    saveFailed: "Couldn't save: {{error}}",
+    discardTitle: "Discard your changes?",
+    discardBody: "The edits to this document haven't been saved.",
+    keepEditing: "Keep editing",
+    discard: "Discard",
     viewSource: "View source",
     preview: "Preview",
   },

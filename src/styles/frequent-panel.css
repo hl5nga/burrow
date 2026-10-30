@@ -233,3 +233,38 @@
 .freq-resizer.dragging::after {
   background: var(--amber);
 }
+
+/* Unpinned: floats over the terminal, just left of the rail. */
+.freq-panel.peek {
+  position: absolute;
+  top: 0;
+  right: 38px;
+  bottom: 0;
+  z-index: 30;
+  box-shadow: -18px 0 40px -12px rgba(0, 0, 0, 0.55);
+}
+
+.panel-pin {
+  all: unset;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  color: var(--text-dim);
+  border-radius: 6px;
+  cursor: default;
+  transform: rotate(45deg);
+}
+
+.panel-pin:hover {
+  color: var(--text-hi);
+  background: color-mix(in srgb, var(--text-hi) 6%, transparent);
+}
+
+.panel-pin.pinned {
+  color: var(--amber);
+  transform: none;
+}

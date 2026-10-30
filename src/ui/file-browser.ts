@@ -10,6 +10,7 @@ import {
 } from "./doc-render";
 import type { ActiveTarget } from "./guardrail-manager";
 import type { TerminalSession } from "../terminal/session";
+import { chooseDialog } from "./dialog";
 import { showToast } from "./toast";
 import { t, onLocaleChange } from "../i18n";
 
@@ -30,6 +31,14 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/** Kept in step with `EDITABLE` in src-tauri/src/files.rs. */
+const EDITABLE = ["md", "markdown", "txt", "json", "yml", "yaml", "toml", "ini", "conf", "env"];
+function isEditable(lowerName: string) {
+  if (lowerName === ".env" || lowerName.startsWith(".env.")) return true;
+  const dot = lowerName.lastIndexOf(".");
+  return dot > 0 && EDITABLE.includes(lowerName.slice(dot + 1));
 }
 
 const size = (n: number) =>
@@ -93,13 +102,13 @@ export class FileBrowser {
     // panel (tasks, frequent commands) stays usable next to an open document.
     (workspace.querySelector<HTMLElement>(".term-body") ?? document.body).append(this.viewer);
     this.viewer.addEventListener("mousedown", (e) => {
-      if (e.target === this.viewer) this.closeViewer();
+      if (e.target === this.viewer) void this.requestClose();
     });
     this.viewer.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        this.closeViewer();
+        void this.requestClose();
       }
     });
     this.viewer.tabIndex = -1;
@@ -287,7 +296,7 @@ export class FileBrowser {
       button(t("fileBrowser.close"), () => this.closeViewer());
       return;
     }
-    const text = content.text;
+    let text = content.text;
     button(
       t("fileBrowser.copy"),
       () => void copyText(text).then(() => showToast(t("fileBrowser.copied"))),
@@ -346,11 +355,96 @@ export class FileBrowser {
         show();
       });
     }
-    button(t("fileBrowser.close"), () => this.closeViewer());
+    if (isEditable(lower)) button(t("fileBrowser.edit"), () => startEdit());
+    button(t("fileBrowser.close"), () => void this.requestClose());
     show();
+
+    const startEdit = () => {
+      const area = el("textarea", "viewer-edit");
+      area.value = text;
+      area.spellcheck = false;
+      const bar = el("div", "viewer-actions");
+      const status = el("span", "viewer-edit-status");
+      const dirty = () => area.value !== text;
+      const leave = () => {
+        this.guard = undefined;
+        bar.remove();
+        actions.hidden = false;
+        show();
+      };
+      const save = async () => {
+        if (!dirty()) return;
+        saveButton.disabled = true;
+        status.textContent = t("fileBrowser.saving");
+        try {
+          await invoke("fs_write", {
+            profileId: target.profileId ?? null,
+            path,
+            text: area.value,
+          });
+          text = area.value;
+          status.textContent = "";
+          showToast(t("fileBrowser.saved"));
+          leave();
+        } catch (err) {
+          saveButton.disabled = false;
+          status.textContent = t("fileBrowser.saveFailed", { error: String(err) });
+        }
+      };
+      const cancel = async () => {
+        if (dirty()) {
+          const choice = await chooseDialog(
+            t("fileBrowser.discardTitle"),
+            [t("fileBrowser.discardBody")],
+            [
+              { value: "keep", label: t("fileBrowser.keepEditing"), kind: "primary" },
+              { value: "discard", label: t("fileBrowser.discard"), kind: "danger" },
+            ],
+          );
+          if (choice !== "discard") {
+            area.focus();
+            return;
+          }
+        }
+        leave();
+      };
+      const saveButton = el("button", "btn", t("fileBrowser.save"));
+      saveButton.type = "button";
+      saveButton.addEventListener("click", () => void save());
+      const cancelButton = el("button", "btn ghost", t("fileBrowser.cancel"));
+      cancelButton.type = "button";
+      cancelButton.addEventListener("click", () => void cancel());
+      bar.append(status, cancelButton, saveButton);
+      area.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+          e.preventDefault();
+          void save();
+        }
+      });
+      this.guard = async () => {
+        await cancel();
+        return false;
+      };
+      actions.hidden = true;
+      head.append(bar);
+      body.replaceChildren(area);
+      area.focus();
+    };
+  }
+
+  /** Set while a document is being edited: Escape / click-outside go through it. */
+  private guard: (() => Promise<boolean>) | undefined;
+
+  private async requestClose() {
+    if (this.guard) {
+      await this.guard();
+      return;
+    }
+    this.closeViewer();
   }
 
   private closeViewer() {
+    this.guard = undefined;
     this.viewer.hidden = true;
     this.viewer.replaceChildren();
     this.active().session?.focus();

@@ -60,7 +60,11 @@ export class FrequentPanel {
   private head?: HTMLElement;
   private tasks?: TaskPanel;
   private items: Ranked[] = [];
+  /** Pinned: docked beside the terminal. Unpinned: folded into the rail. */
   private open = true;
+  /** Unpinned, but the rail was clicked: the panel floats over the terminal. */
+  private peeking = false;
+  private readonly pin = el("button", "panel-pin");
   // What was on screen for the current scope/place, to spot newly promoted entries.
   private seenKey = "";
   private seen = new Set<string>();
@@ -93,7 +97,20 @@ export class FrequentPanel {
       el("span", "rail-icon", "★"),
       el("span", "rail-hotkey", t("frequentPanel.hotkey")),
     );
-    this.rail.addEventListener("click", () => this.setOpen(true, true));
+    this.rail.addEventListener("click", () => this.peek(true, true));
+    this.pin.type = "button";
+    this.pin.innerHTML =
+      '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">' +
+      '<path d="M9.8 1.5l4.7 4.7-1.4.7-2 2 .3 2.6-1 1-2.9-2.9-4.1 4.1-.9-.9 4.1-4.1L3.7 6.8l1-1 2.6.3 2-2z"/></svg>';
+    this.pin.addEventListener("click", () => this.setOpen(!this.open, !this.open));
+    document.addEventListener("pointerdown", (e) => {
+      if (
+        this.peeking &&
+        !this.element.contains(e.target as Node) &&
+        !this.rail.contains(e.target as Node)
+      )
+        this.peek(false, false);
+    });
 
     host.append(this.element, this.rail);
     this.updateTabs();
@@ -114,6 +131,7 @@ export class FrequentPanel {
       this.viewTabs.set(view, b);
       switcher.append(b);
     }
+    switcher.append(this.pin);
     this.element.prepend(switcher);
     this.element.append(tasks.element);
     let saved: string | null = null;
@@ -154,6 +172,7 @@ export class FrequentPanel {
     this.viewTabs.get("tasks")?.replaceChildren(t("tasks.tabTasks"));
     this.hint.textContent = t("frequentPanel.footerHint");
     this.rail.title = t("frequentPanel.railTitle");
+    this.updatePin();
     this.tabs.get("dir")!.textContent = t("frequentPanel.scopeDir");
     this.tabs.get("all")!.textContent = t("frequentPanel.scopeAll");
     this.tabs.get("host")!.textContent =
@@ -228,12 +247,14 @@ export class FrequentPanel {
   toggle() {
     const focused = this.element.contains(document.activeElement);
     if (this.open && focused) this.setOpen(false, false);
-    else this.setOpen(true, true);
+    else if (this.open) this.element.focus();
+    else if (this.peeking && focused) this.peek(false, false);
+    else this.peek(true, true);
   }
 
   async refresh() {
     const session = this.getSession();
-    if (!session || !this.open) return;
+    if (!session || !(this.open || this.peeking)) return;
     const { host, cwd } = session.context();
     const [items, config] = await Promise.all([
       invoke<Ranked[]>("stats_top", { host, cwd, scope: this.scope, limit: LIMIT }),
@@ -321,11 +342,39 @@ export class FrequentPanel {
 
   private applyOpen(open: boolean) {
     this.open = open;
+    this.peeking = false;
+    this.element.classList.remove("peek");
     this.element.hidden = !open;
     this.rail.hidden = open;
+    this.updatePin();
+  }
+
+  /** Unpinned: float the panel over the terminal (or tuck it away again). */
+  private peek(show: boolean, focus: boolean) {
+    if (this.open || this.peeking === show) return;
+    this.peeking = show;
+    this.element.classList.toggle("peek", show);
+    this.element.hidden = !show;
+    if (show) {
+      void this.refresh();
+      if (focus) this.element.focus();
+    } else if (focus) {
+      this.getSession()?.focus();
+    }
+  }
+
+  private updatePin() {
+    this.pin.classList.toggle("pinned", this.open);
+    this.pin.title = this.open ? t("frequentPanel.unpin") : t("frequentPanel.pin");
+    this.pin.setAttribute("aria-pressed", String(this.open));
   }
 
   private onKey(e: KeyboardEvent) {
+    if (e.key === "Escape" && this.peeking && !(e.target instanceof HTMLTextAreaElement)) {
+      e.preventDefault();
+      this.peek(false, true);
+      return;
+    }
     // The Tasks view has text fields: digits and arrows are for typing there.
     if (this.view === "tasks") {
       if (e.key === "Escape" && !(e.target instanceof HTMLTextAreaElement)) {
@@ -360,5 +409,6 @@ export class FrequentPanel {
     if (!item || !session) return;
     session.focus();
     session.run(item.command);
+    this.peek(false, false);
   }
 }
