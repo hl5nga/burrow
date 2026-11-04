@@ -97,6 +97,19 @@ impl StoreFile for CommandsFile {
 pub struct HostStats {
     pub global: HashMap<String, u64>,
     pub by_dir: HashMap<String, HashMap<String, u64>>,
+    /// Distinct commands, newest first, so the panel has something to offer
+    /// before any command reaches the promotion threshold.
+    pub recent: Vec<RecentCommand>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RecentCommand {
+    pub command: String,
+    /// Where it was last run.
+    pub cwd: String,
+    /// Unix milliseconds.
+    pub at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -118,6 +131,40 @@ impl Default for StatsFile {
 
 impl StoreFile for StatsFile {
     const FILE_NAME: &'static str = "stats.json";
+}
+
+// ---------- saved-commands.json ----------
+
+/// A command the user pinned by hand. It is shown on top of the frequent list
+/// whether or not it was ever run often enough to be promoted.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SavedCommand {
+    pub id: String,
+    pub command: String,
+    /// The host it belongs to ("local" or a remote's name); None = every host.
+    pub host: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SavedCommandsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub commands: Vec<SavedCommand>,
+}
+
+impl Default for SavedCommandsFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            commands: Vec::new(),
+        }
+    }
+}
+
+impl StoreFile for SavedCommandsFile {
+    const FILE_NAME: &'static str = "saved-commands.json";
 }
 
 // ---------- config.json ----------
@@ -166,7 +213,7 @@ impl Default for ConfigFile {
     fn default() -> Self {
         Self {
             version: CURRENT_VERSION,
-            promotion_threshold: 5,
+            promotion_threshold: 3,
             frequent_panel_open: true,
             frequent_panel_width: 300,
             copy_on_select: false,

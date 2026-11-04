@@ -48,7 +48,7 @@ fn missing_files_are_created_with_defaults_and_presets() {
     let root = TempRoot::new();
     let store = Store::open(root.0.clone()).unwrap();
 
-    assert_eq!(store.load::<ConfigFile>().promotion_threshold, 5);
+    assert_eq!(store.load::<ConfigFile>().promotion_threshold, 3);
     assert_eq!(
         store.load::<GuardrailsFile>().rules,
         GuardrailsFile::default().rules
