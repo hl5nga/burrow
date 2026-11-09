@@ -6,6 +6,7 @@ import {
   type TerminalSession,
 } from "../terminal/session";
 import type { HookEvent } from "../terminal/hook-events";
+import { shellQuote } from "./shell-quote";
 import { showToast } from "./toast";
 import { checkReachable, type Reachability } from "./reachability";
 import { guardPaste } from "./paste-guard";
@@ -263,6 +264,68 @@ export class TabManager {
     }
   }
 
+  /**
+   * Local files (dragged in from Finder) as paths the active tab's host can
+   * read: their own paths on this Mac, or copies made on the host for a remote
+   * tab (it can't see this Mac's disk). Failures are toasted and left out.
+   */
+  async preparePaths(paths: string[]): Promise<string[]> {
+    const tab = this.active;
+    if (!tab?.session || paths.length === 0) return [];
+    if (!tab.connection && tab.context.host !== "local") {
+      showToast(t("tabs.dropForeignShell"));
+      return [];
+    }
+    if (tab.connection)
+      showToast(t("tabs.dropCopying", { where: tab.title ?? t("tabs.remoteLabel") }));
+    const ready: string[] = [];
+    for (const path of paths) {
+      try {
+        ready.push(
+          await invoke<string>("drop_file_prepare", {
+            profileId: tab.connection?.profileId ?? null,
+            path,
+          }),
+        );
+      } catch (err) {
+        showToast(
+          t("tabs.dropFailed", { name: path.split("/").pop() ?? path, error: String(err) }),
+        );
+      }
+    }
+    return ready;
+  }
+
+  /**
+   * Files dragged in from Finder: their paths go to the prompt, quoted and
+   * separated by spaces, without Enter.
+   */
+  async dropFiles(paths: string[]) {
+    const ready = await this.preparePaths(paths);
+    const session = this.active?.session;
+    if (!session || ready.length === 0) return;
+    session.paste(ready.map(shellQuote).join(" ") + " ");
+    session.focus();
+  }
+
+  /** The clipboard picture saved on the active tab's host; its path, or undefined. */
+  async clipboardImagePath(): Promise<string | undefined> {
+    const tab = this.active;
+    if (!tab?.session) return undefined;
+    if (!tab.connection && tab.context.host !== "local") {
+      showToast(t("tabs.pasteImageForeignShell"));
+      return undefined;
+    }
+    try {
+      return await invoke<string>("clip_image_save", {
+        profileId: tab.connection?.profileId ?? null,
+      });
+    } catch (err) {
+      showToast(t("tabs.pasteImageFailed", { error: String(err) }));
+      return undefined;
+    }
+  }
+
   /** The active tab's host and folder, for per-host actions like hook installs. */
   activeTarget() {
     const tab = this.active;
@@ -301,14 +364,17 @@ export class TabManager {
       label: tab.title ?? t("launcher.thisMac"),
       active: tab === this.active,
       reachable: !tab.connection || tab.connection.state === "connected",
+      // The tab's one status dot: connection trouble wins in CSS, otherwise
+      // the host's CPU/RAM level colors it.
       setLevel: (value: Level | undefined) => {
-        let dot = tab.element.querySelector<HTMLElement>(".res-dot");
-        if (!value) return dot?.remove();
-        if (!dot) {
-          dot = document.createElement("span");
-          tab.element.insertBefore(dot, tab.element.querySelector(".close"));
+        const dot = tab.element.querySelector<HTMLElement>(".dot");
+        if (!dot) return;
+        for (const level of ["ok", "warn", "high"]) dot.classList.remove(`lvl-${level}`);
+        if (!value) {
+          dot.removeAttribute("title");
+          return;
         }
-        dot.className = `res-dot ${value}`;
+        dot.classList.add(`lvl-${value}`);
         dot.title = {
           ok: t("tabs.resourceOk"),
           warn: t("tabs.resourceWarn"),

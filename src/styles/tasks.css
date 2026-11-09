@@ -112,7 +112,7 @@
 .task-sort-select {
   padding: 2px 4px;
   font-family: var(--ui);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-mid);
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -138,7 +138,7 @@
 .task-serial {
   margin-right: 6px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--text-dim);
 }
@@ -150,7 +150,7 @@
 .task-filter-btn {
   all: unset;
   padding: 3px 9px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -228,7 +228,7 @@
   gap: 6px;
   align-items: center;
   margin-top: 3px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
@@ -252,7 +252,7 @@
   all: unset;
   flex-shrink: 0;
   padding: 4px 10px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--amber-fg);
   background: var(--amber-fill);
@@ -265,7 +265,7 @@
   gap: 8px;
   align-items: center;
   padding: 6px 10px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--status-orange);
   border-top: 1px solid var(--border);
 }
@@ -277,7 +277,7 @@
 .task-banner-btn {
   all: unset;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--amber-fg);
   background: var(--amber-fill);
@@ -306,12 +306,12 @@
 }
 
 .task-field > span {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
 .task-field small {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
@@ -328,7 +328,7 @@
 }
 
 .task-history {
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
@@ -363,14 +363,14 @@
   align-items: center;
   justify-content: space-between;
   margin: 12px 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-mid);
 }
 
 .assign-refresh {
   all: unset;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-dim);
   cursor: default;
@@ -410,7 +410,7 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -419,7 +419,7 @@
 .assign-bypass {
   padding: 0 5px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--status-red);
   border: 1px solid color-mix(in srgb, var(--status-red) 40%, transparent);
   border-radius: 4px;
@@ -434,7 +434,7 @@
 
 .assign-dot {
   flex-shrink: 0;
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1;
   color: var(--status-gray);
 }
@@ -461,7 +461,7 @@
 
 .assign-warn {
   padding: 6px 9px;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--status-orange);
   background: color-mix(in srgb, var(--status-orange) 10%, transparent);

@@ -18,7 +18,7 @@
   gap: 4px;
   padding: 3px 9px 3px 7px;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-hi);
   background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
@@ -78,7 +78,7 @@
 .res-hud .rh-head {
   margin-bottom: 9px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -117,14 +117,14 @@
 .vpn-sub {
   grid-column: 2;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
 .vpn-note {
   margin-top: 4px;
   padding-top: 8px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   line-height: 1.5;
   color: var(--text-dim);
   border-top: 1px solid var(--border);
@@ -160,7 +160,7 @@
 .rh-row {
   display: flex;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-mid);
 }
 
@@ -204,26 +204,8 @@
 .rh-detail {
   margin-bottom: 9px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
-}
-
-.res-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-}
-
-.res-dot.ok {
-  background: var(--status-green);
-}
-
-.res-dot.warn {
-  background: var(--status-orange);
-}
-
-.res-dot.high {
-  background: var(--status-red);
 }
 
 .vpn-row {
@@ -239,7 +221,7 @@
   grid-row: 1 / span 2;
   grid-column: 3;
   padding: 3px 9px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--amber);
   background: color-mix(in srgb, var(--amber) 8%, transparent);
@@ -268,7 +250,7 @@
 
 .rm-chip.language {
   font-family: var(--ui);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.02em;
 }
 
@@ -342,7 +324,7 @@
 .text-row-label {
   display: inline-block;
   margin-bottom: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
@@ -351,7 +333,7 @@
   float: right;
   margin-bottom: 6px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-mid);
 }
 
@@ -393,7 +375,7 @@
 
 .text-reset {
   all: unset;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   cursor: default;
 }
@@ -454,7 +436,7 @@
 .settings-section h4 {
   margin-bottom: 10px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;

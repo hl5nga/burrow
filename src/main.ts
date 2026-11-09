@@ -8,6 +8,8 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import type { SessionContext } from "./terminal/session";
 import { CommandPalette } from "./ui/palette";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { DraftEditor } from "./ui/draft-editor";
 import { FrequentPanel } from "./ui/frequent-panel";
 import { CommandManager } from "./ui/command-manager";
 import { TabManager, type Connection } from "./ui/tabs";
@@ -40,6 +42,7 @@ import type { StoredCommand } from "./ui/command-validation";
 import "./styles/palette.css";
 import "./styles/frequent-panel.css";
 import "./styles/tasks.css";
+import "./styles/draft.css";
 import "./styles/command-manager.css";
 import "./styles/blocks.css";
 import "./styles/hud.css";
@@ -140,6 +143,7 @@ const tabs = new TabManager(
   {
     onActiveContext: (context) => {
       showContext(context);
+      drafts.activeChanged();
       files.follow();
       resources.activeChanged();
       usage.activeChanged();
@@ -244,6 +248,33 @@ tabs.observe(agents);
 tabs.observe(new GuardrailPrompt());
 const frequent = new FrequentPanel(app.querySelector<HTMLElement>(".workspace")!, activeSession);
 const activeProfileId = () => tabs.sshTabs().find((x) => x.tab.isActive())?.profileId;
+// Finder drops arrive as native events (the webview itself never sees them).
+// An open Draft editor takes the ones dropped on it; the terminal gets the rest.
+void getCurrentWebview().onDragDropEvent((event) => {
+  const body = app.querySelector<HTMLElement>(".term-body");
+  const p = event.payload;
+  const at =
+    p.type === "leave"
+      ? undefined
+      : { x: p.position.x / window.devicePixelRatio, y: p.position.y / window.devicePixelRatio };
+  const overEditor = drafts.takes(at);
+  drafts.setDropHover(overEditor && p.type !== "drop" && p.type !== "leave");
+  body?.classList.toggle("dropping", !overEditor && (p.type === "over" || p.type === "enter"));
+  if (p.type === "drop" && !drafts.handleDrop(p.paths, at)) void tabs.dropFiles(p.paths);
+});
+
+const drafts = new DraftEditor({
+  activeSession,
+  activeTab: () => {
+    const target = tabs.activeTarget();
+    return target && { profileId: target.profileId, label: target.hostLabel };
+  },
+  targetsFor: (profileId) => agents.targetsFor(profileId),
+  preparePaths: (paths) => tabs.preparePaths(paths),
+  clipboardImagePath: () => tabs.clipboardImagePath(),
+});
+app.querySelector<HTMLElement>(".statusbar .cwd")!.after(drafts.chips);
+
 const taskPanel = new TaskPanel(agents, activeProfileId);
 frequent.attachTasks(taskPanel);
 if (import.meta.env.DEV) devBag.taskPanel = taskPanel;
@@ -283,6 +314,11 @@ keys.register({
   id: "open-keybindings",
   label: t("keybindings.actions.keybindingSettings"),
   run: () => (keys.isOpen ? keys.close() : keys.open(focusTerminal)),
+});
+keys.register({
+  id: "toggle-draft-editor",
+  label: t("keybindings.actions.draftEditor"),
+  run: () => drafts.toggle(),
 });
 keys.register({
   id: "toggle-file-browser",
@@ -337,6 +373,10 @@ keys.addToggle(
     );
   },
 );
+keys.onChange(() => {
+  drafts.setHotkey(keys.label("toggle-draft-editor"));
+  frequent.setHotkey(keys.label("toggle-frequent-panel"));
+});
 void keys.load();
 
 void invoke<{ copyOnSelect?: boolean }>("store_get", { kind: "config" }).then((c) => {
@@ -404,6 +444,7 @@ async function start() {
   // jumps to another a moment later leaves remote apps (Claude Code's input
   // box in tmux) drawn for the old width.
   await frequent.init();
+  await drafts.init();
   const auto = await resolveAutoOpen();
   if (auto) {
     await openEntry(auto);

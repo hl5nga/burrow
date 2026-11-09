@@ -11,6 +11,7 @@ import {
 import type { ActiveTarget } from "./guardrail-manager";
 import type { TerminalSession } from "../terminal/session";
 import { chooseDialog } from "./dialog";
+import { shellQuote } from "./shell-quote";
 import { showToast } from "./toast";
 import { t, onLocaleChange } from "../i18n";
 
@@ -60,8 +61,6 @@ function icon(e: Entry): string {
 
 const join = (dir: string, name: string) => (dir === "/" ? `/${name}` : `${dir}/${name}`);
 const parent = (dir: string) => dir.replace(/\/[^/]+\/?$/, "") || "/";
-const shellQuote = (p: string) =>
-  /^[\w./@%+=:,-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`;
 
 /**
  * A docked, read-only view of the active tab's folder, following the shell's

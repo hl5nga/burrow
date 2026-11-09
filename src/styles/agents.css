@@ -39,7 +39,7 @@
 
 .agents-head .kbd {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
@@ -53,14 +53,14 @@
 
 .agents-note {
   padding-bottom: 0;
-  font-size: 11px;
+  font-size: 12px;
   border-top: 1px solid var(--border);
 }
 
 .agents-host {
   margin: 10px 4px 2px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 0.04em;
   color: var(--cyan);
 }
@@ -85,7 +85,7 @@
   flex-shrink: 0;
   width: 64px;
   padding: 3px 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-align: center;
   border-radius: 6px;
@@ -141,7 +141,7 @@
 .agent-where {
   overflow: hidden;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -149,14 +149,15 @@
 
 .agent-time {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
 /* Tab badges */
 .agent-badge {
-  width: 7px;
-  height: 7px;
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
@@ -236,7 +237,7 @@
 }
 
 .agent-chip.none {
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
 /* 에러는 오렌지·그레이와 구분되어야 눈에 띄므로 빨강을 유지한다. */

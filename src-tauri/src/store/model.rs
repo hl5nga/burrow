@@ -568,6 +568,7 @@ impl Default for KeybindingsFile {
             bind("copy", "Cmd+C"),
             bind("open-keybindings", "Cmd+/"),
             bind("toggle-file-browser", "Cmd+Shift+E"),
+            bind("toggle-draft-editor", "Cmd+Shift+D"),
         ];
         bindings.extend((1..=9).map(|n| bind(&format!("select-tab-{n}"), &format!("Cmd+{n}"))));
         Self {
@@ -709,4 +710,92 @@ impl TasksFile {
 
 impl StoreFile for TasksFile {
     const FILE_NAME: &'static str = "tasks.json";
+}
+
+// ---------- drafts.json ----------
+
+/// How many saved drafts (slots) the status bar offers.
+pub const DRAFT_SLOTS: usize = 5;
+/// How many earlier drafts are kept so a mistake can be undone.
+pub const DRAFT_RECENT: usize = 10;
+
+/// A saved draft. `target` is the tmux window it goes to ("session:window"),
+/// or None for the active tab's own prompt.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DraftSlot {
+    pub text: String,
+    pub target: Option<String>,
+    pub saved_at: u64,
+}
+
+/// The draft being written, kept so closing the editor (or the app) loses nothing.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DraftCurrent {
+    pub text: String,
+    pub cursor: u32,
+    pub target: Option<String>,
+    /// The slot (0-based) this draft was loaded from or will be saved to.
+    pub slot: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DraftRecent {
+    pub text: String,
+    pub target: Option<String>,
+    pub at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DraftsFile {
+    #[serde(default = "current_version")]
+    pub version: u32,
+    pub slots: Vec<Option<DraftSlot>>,
+    pub current: DraftCurrent,
+    pub recent: Vec<DraftRecent>,
+}
+
+impl Default for DraftsFile {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_VERSION,
+            slots: vec![None; DRAFT_SLOTS],
+            current: DraftCurrent::default(),
+            recent: Vec::new(),
+        }
+    }
+}
+
+impl DraftsFile {
+    /// Exactly five slots and at most ten earlier drafts, whatever the file said.
+    pub fn normalize(&mut self) {
+        self.slots.resize(DRAFT_SLOTS, None);
+        self.recent.truncate(DRAFT_RECENT);
+    }
+}
+
+impl StoreFile for DraftsFile {
+    const FILE_NAME: &'static str = "drafts.json";
+}
+
+#[cfg(test)]
+mod drafts_tests {
+    use super::*;
+
+    #[test]
+    fn drafts_files_are_forced_to_five_slots_and_ten_recent() {
+        let mut file: DraftsFile = serde_json::from_str(
+            r#"{"slots":[{"text":"a"}],"recent":[{"text":"1"},{"text":"2"},{"text":"3"},{"text":"4"},{"text":"5"},{"text":"6"},{"text":"7"},{"text":"8"},{"text":"9"},{"text":"10"},{"text":"11"}]}"#,
+        )
+        .unwrap();
+        file.normalize();
+        assert_eq!(file.slots.len(), DRAFT_SLOTS);
+        assert_eq!(file.slots[0].as_ref().unwrap().text, "a");
+        assert!(file.slots[1..].iter().all(Option::is_none));
+        assert_eq!(file.recent.len(), DRAFT_RECENT);
+        assert_eq!(DraftsFile::default().slots.len(), DRAFT_SLOTS);
+    }
 }

@@ -96,6 +96,8 @@ export class FrequentPanel {
   /** Unpinned, but the rail was clicked: the panel floats over the terminal. */
   private peeking = false;
   private readonly pin = el("button", "panel-pin");
+  private readonly railHotkey = el("span", "rail-hotkey", t("frequentPanel.hotkey"));
+  private hotkey = "";
   // What was on screen for the current scope/place, to spot newly promoted entries.
   private seenKey = "";
   private seen = new Set<string>();
@@ -125,10 +127,7 @@ export class FrequentPanel {
     this.element.addEventListener("keydown", (e) => this.onKey(e));
     this.element.append(this.makeResizer());
 
-    this.rail.append(
-      el("span", "rail-icon", "★"),
-      el("span", "rail-hotkey", t("frequentPanel.hotkey")),
-    );
+    this.rail.append(el("span", "rail-icon", "★"), this.railHotkey);
     this.rail.addEventListener("click", () => this.peek(true, true));
     this.pin.type = "button";
     this.pin.innerHTML =
@@ -151,6 +150,14 @@ export class FrequentPanel {
     // this subscription is never unsubscribed — same as command-manager.ts.
     onLocaleChange(() => this.retranslate());
     this.retranslate();
+  }
+
+  /** The shortcut that opens/folds the panel, shown under the rail's star and in the pin's tooltip. */
+  setHotkey(label: string) {
+    this.hotkey = label;
+    this.railHotkey.textContent = label;
+    this.railHotkey.hidden = !label;
+    this.updatePin();
   }
 
   /** Adds the "Tasks" view next to the commands, with a switch at the top. */
@@ -205,7 +212,9 @@ export class FrequentPanel {
     this.viewTabs.get("tasks")?.replaceChildren(t("tasks.tabTasks"));
     this.hint.textContent = t("frequentPanel.footerHint");
     this.retranslateAdd();
-    this.rail.title = t("frequentPanel.railTitle");
+    this.rail.title = this.hotkey
+      ? `${t("frequentPanel.railTitle")} (${this.hotkey})`
+      : t("frequentPanel.railTitle");
     this.updatePin();
     this.tabs.get("dir")!.textContent = t("frequentPanel.scopeDir");
     this.tabs.get("all")!.textContent = t("frequentPanel.scopeAll");
@@ -565,7 +574,8 @@ export class FrequentPanel {
 
   private updatePin() {
     this.pin.classList.toggle("pinned", this.open);
-    this.pin.title = this.open ? t("frequentPanel.unpin") : t("frequentPanel.pin");
+    const hint = this.open ? t("frequentPanel.unpin") : t("frequentPanel.pin");
+    this.pin.title = this.hotkey ? `${hint} (${this.hotkey})` : hint;
     this.pin.setAttribute("aria-pressed", String(this.open));
   }
 

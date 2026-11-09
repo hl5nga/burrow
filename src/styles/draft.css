@@ -1,0 +1,243 @@
+/* Draft editor window (T34). Floats by default; `.modal` sits over a dimmed screen. */
+.draft-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 899;
+  background: rgba(6, 7, 9, 0.5);
+}
+
+.draft-backdrop[hidden],
+.draft-win[hidden],
+.draft-recent[hidden] {
+  display: none;
+}
+
+.draft-win {
+  position: fixed;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: clamp(420px, 45vw, 90vw);
+  padding: 10px 14px 12px;
+  font-family: var(--ui);
+  color: var(--text-hi);
+  background: var(--bg-panel);
+  border: 1px solid var(--text-dim);
+  border-radius: 12px;
+  outline: none;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+
+.draft-win.dropping {
+  border-color: var(--amber);
+  box-shadow:
+    0 0 0 2px var(--amber),
+    0 30px 80px -20px rgba(0, 0, 0, 0.7);
+}
+
+.draft-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.draft-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.draft-where {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--cyan);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.draft-head-btn {
+  all: unset;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: default;
+}
+
+.draft-head-btn:hover {
+  color: var(--text-hi);
+  background: color-mix(in srgb, var(--text-hi) 6%, transparent);
+}
+
+.draft-close {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-dim);
+  border-radius: 5px;
+  cursor: default;
+}
+
+.draft-close:hover {
+  color: var(--text-hi);
+  background: color-mix(in srgb, var(--text-hi) 10%, transparent);
+}
+
+.draft-row,
+.draft-slotbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.draft-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.draft-select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--text-hi);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.draft-select.slot {
+  flex: 0 0 auto;
+  min-width: 64px;
+}
+
+.draft-text {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  /* Five lines to start with; drag the corner to make it taller. */
+  height: calc(5 * 1.6em + 20px);
+  min-height: calc(3 * 1.6em + 20px);
+  max-height: 70vh;
+  padding: 10px 12px;
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-hi);
+  resize: vertical;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+
+.draft-text:focus {
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+}
+
+.draft-message {
+  min-height: 0;
+  font-size: 12px;
+  color: var(--amber);
+}
+
+.draft-message:empty {
+  display: none;
+}
+
+.draft-foot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.draft-stats {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.draft-recent {
+  position: absolute;
+  top: 40px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, 80%);
+  max-height: 260px;
+  padding: 4px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+}
+
+.draft-recent-row {
+  all: unset;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  border-radius: 5px;
+  cursor: default;
+}
+
+.draft-recent-row:hover {
+  background: color-mix(in srgb, var(--text-hi) 7%, transparent);
+}
+
+.draft-recent-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.draft-recent-time {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.draft-recent-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.draft-kbd {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 400;
+  opacity: 0.9;
+}

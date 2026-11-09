@@ -125,9 +125,88 @@ pub fn clip_image_save(
         .ok_or_else(|| "원격 경로를 받지 못했습니다".into())
 }
 
+/// Biggest file a drop will copy to a remote host.
+const MAX_DROP: u64 = 25 * 1024 * 1024;
+
+/// A name that is safe in a shell and in a path: letters, digits, `.`, `_`, `-`.
+fn drop_name(original: &str) -> String {
+    let clean: String = original
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let clean = clean.trim_start_matches('.');
+    let clean = if clean.is_empty() { "file" } else { clean };
+    format!(
+        "drop-{}-{}",
+        file_name()
+            .trim_start_matches("clip-")
+            .trim_end_matches(".png"),
+        clean
+    )
+}
+
+/// A file dropped onto a terminal tab. On this Mac its own path is used; on a
+/// host the file is copied there first (the host can't see this Mac's disk),
+/// and the copy's path comes back.
+#[tauri::command(async)]
+pub fn drop_file_prepare(
+    store: tauri::State<'_, Arc<Store>>,
+    profile_id: Option<String>,
+    path: String,
+) -> Result<String, String> {
+    let Some(id) = profile_id else {
+        return Ok(path);
+    };
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.is_dir() {
+        return Err("폴더는 원격으로 복사할 수 없습니다".into());
+    }
+    if meta.len() > MAX_DROP {
+        return Err(format!(
+            "파일이 너무 큽니다 ({} MB 이하만 복사)",
+            MAX_DROP / 1024 / 1024
+        ));
+    }
+    let profile = remote::load_profile(&store, &id)?;
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let base = Path::new(&path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let name = drop_name(&base);
+    let script = format!(
+        "umask 077; d=/tmp/burrow-$(id -u); mkdir -p \"$d\" && chmod 700 \"$d\" && \
+         [ -O \"$d\" ] || {{ echo \"$d is not ours\" >&2; exit 1; }}; \
+         find \"$d\" -name 'drop-*' -mmin +{KEEP_MINUTES} -delete 2>/dev/null; \
+         cat > \"$d/{name}\" && printf '%s\\n' \"$d/{name}\""
+    );
+    let out = remote::side_command(&store, &profile, &script, Some(&bytes))?;
+    out.lines()
+        .rev()
+        .find(|l| l.ends_with(&name))
+        .map(str::to_string)
+        .ok_or_else(|| "원격 경로를 받지 못했습니다".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dropped_file_names_are_shell_safe() {
+        let n = drop_name("내 파일 (1).txt");
+        assert!(n.starts_with("drop-") && n.ends_with(".txt"));
+        assert!(n
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)));
+        assert!(drop_name("..").ends_with("-file") || drop_name("..").contains("file"));
+    }
 
     #[test]
     fn file_names_are_plain_and_unique_enough() {

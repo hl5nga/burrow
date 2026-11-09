@@ -98,7 +98,15 @@ export class Keybindings {
     this.index();
   }
 
+  private readonly listeners: (() => void)[] = [];
+
+  /** Runs after the bindings were loaded or changed (for hints that show a shortcut). */
+  onChange(listener: () => void) {
+    this.listeners.push(listener);
+  }
+
   private index() {
+    for (const listener of this.listeners) listener();
     this.byCombo = new Map();
     for (const b of this.bindings) {
       const combo = b.keys && normalizeCombo(b.keys);

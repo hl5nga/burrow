@@ -220,6 +220,11 @@ impl Store {
                 }
                 serde_json::to_value(file)
             }
+            "drafts" => {
+                let mut file = self.load::<DraftsFile>();
+                file.normalize();
+                serde_json::to_value(file)
+            }
             _ => return Err(format!("unknown store file: {kind}")),
         };
         value.map_err(|e| e.to_string())
@@ -244,6 +249,12 @@ impl Store {
             "secrets-patterns" => put::<SecretsPatternsFile>(self, value),
             "keybindings" => put::<KeybindingsFile>(self, value),
             "tasks" => put::<TasksFile>(self, value),
+            "drafts" => {
+                let mut parsed: DraftsFile =
+                    serde_json::from_value(value).map_err(|e| e.to_string())?;
+                parsed.normalize();
+                self.save(&parsed).map_err(|e| e.to_string())
+            }
             _ => Err(format!("unknown store file: {kind}")),
         }
     }

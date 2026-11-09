@@ -143,7 +143,7 @@
   margin-top: 3px;
   overflow: hidden;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -152,7 +152,7 @@
 .cr-tag {
   padding: 1px 5px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 400;
   color: var(--text-dim);
   border: 1px solid var(--border);
@@ -163,7 +163,7 @@
   flex-shrink: 0;
   padding: 3px 7px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   border-radius: 5px;
 }
 
@@ -215,7 +215,7 @@
 .cr-connect {
   flex-shrink: 0;
   padding: 5px 10px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--amber);
   background: color-mix(in srgb, var(--amber) 8%, transparent);
@@ -283,7 +283,7 @@
 .field-hint,
 .field-error {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--text-dim);
 }
@@ -428,7 +428,7 @@
   padding: 10px 12px;
   overflow: auto;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--text-hi);
   white-space: pre;
@@ -488,13 +488,13 @@
 }
 
 .keys-alt {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
 .keys-reset {
   all: unset;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
   cursor: default;
 }
@@ -508,7 +508,7 @@
   grid-column: 1 / -1;
   gap: 8px;
   align-items: center;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--status-red);
 }
 
@@ -533,7 +533,7 @@
   align-items: center;
   padding: 4px 6px 4px 10px;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--cyan);
   background: color-mix(in srgb, var(--cyan) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--cyan) 25%, transparent);
@@ -586,7 +586,7 @@
 
 .about-version {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
@@ -600,7 +600,7 @@
 .about-stack {
   margin-bottom: 20px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 0.04em;
   color: var(--text-dim);
 }
@@ -612,5 +612,5 @@
 
 .vpn-suggest {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
